@@ -106,7 +106,7 @@ Install with one command:\
 - Connect your device
 - go to https://login.tailscale.com/admin/machines to see a list of all devices
 
-### Setup Android APP:
+## Setup Android APP:
 
 - Visit https://drive.google.com/drive/folders/15eSAh2_Q_ZZ81lj0tSRdt0VHG018Qh6l?usp=drive_link to find the latest .apk
 - Install the .apk
