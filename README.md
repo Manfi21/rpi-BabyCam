@@ -8,7 +8,7 @@
 - Connect via shh
 - switch to root
 ```
-  sudo su
+sudo su
 ```
 - Update the Pi
 ```
