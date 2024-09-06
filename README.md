@@ -146,6 +146,6 @@ tailscale up
 - Visit [BabyCam Google Drive](https://drive.google.com/drive/folders/15eSAh2_Q_ZZ81lj0tSRdt0VHG018Qh6l?usp=drive_link) to find the latest .apk
 - Install the .apk
 - Swipe from left to right to open the side menu an click `Settings`
-- Enter the Local and if setup Remote URL (WebRTC recommended)
+- Enter the Local and if setup Remote URL (WebRTC recommended or HLS)
 - click `Save`
 - Swipe from left to right an select the right URL type
