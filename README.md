@@ -3,8 +3,8 @@
 # Installation
 ## Raspberry Pi:
 - Install the latest Pi OS lite 64bit
-- Setup home Wifi
-- Setup Hostname `PiCam`
+  - Setup home Wifi
+  - Setup Hostname `PiCam`
 - Connect via shh
 - switch to root
 ```
