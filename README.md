@@ -4,11 +4,11 @@
 
 # Installation
 ## Raspberry Pi:
-- Install the latest Pi OS lite 64bit
+- Install the latest Pi OS lite 64bit and go to Advanced Settings
   - Setup home Wifi
   - Setup Hostname `PiCam`
 - Connect via shh
-- switch to root
+- Switch to root
 ```
 sudo su
 ```
@@ -18,13 +18,13 @@ sudo apt update && apt upgrade -y
 ```
 
 ## Install MediaMTX :
-MediaMTX will be downloaded. Which version you use depends on Raspbian version and Pi used
+MediaMTX will now be downloaded. Which version you use depends on Raspbian version and Pi used
 - Get Raspian version 
 ```
 uname -m
 ```
 - Visit https://github.com/bluenviron/mediamtx/releases for latest versions and download links.
-- Copy the link and enter in the terminal with wget prefix, below example I’m using a 64bit version
+- Copy the link and enter in the terminal with wget prefix, below example I’m using the lattest (v1.9.0) 64bit version
 ```
 wget https://github.com/bluenviron/mediamtx/releases/download/v1.9.0/mediamtx_v1.9.0_linux_arm64v8.tar.gz
 ```
@@ -77,7 +77,7 @@ paths:
 - Save and Exit.
 
 ### Add a service:
-To allow it to start automatically and for easier control of it the program can be created as service. 
+To allow it to start automatically and for easier control of the video feed, the program can be created as service. 
 ```
 sudo mkdir /opt/mediamtx
 sudo cp mediamtx /opt/mediamtx/
@@ -107,7 +107,7 @@ WantedBy=multi-user.target
 ```
 sudo systemctl daemon-reload
 ```
-- start the service and enable at the same time
+- Start the service and enable at the same time
 ```
 sudo systemctl enable --now mediamtx
 ```
@@ -123,7 +123,7 @@ VLC -> rtsp://{RPI IP-Address}:8554/cam
 WebRTC -> http://{RPI IP-Address}:8889/cam
 HLS -> http://{RPI IP-Address}:8888/cam
 ```
-- You can also use the Pi hostname `PiCam.local` instead of IP Adress
+You can also use the Pi hostname `PiCam.local` instead of IP Adress.
 
 ## Setup Tailscale:
 With Tailscale remote access is easy to setup.
@@ -148,11 +148,11 @@ tailscale up
 - Visit [BabyCam Google Drive](https://drive.google.com/drive/folders/15eSAh2_Q_ZZ81lj0tSRdt0VHG018Qh6l?usp=drive_link) to find the latest .apk
 - Install the .apk
 - Swipe from left to right to open the side menu an click `Settings`
-- Enter the Local and if setup Remote URL (WebRTC recommended or HLS)
+- Enter the Local and if setup Remote URL (WebRTC recommended for low latency)
 - click `Save`
 - Swipe from left to right an select the right URL type
 
 # 3D printed Housing
 
-Customized parts can be found [here](3D_files)\
-Gopro style mounting extension can be found on [Thingiverse](https://www.thingiverse.com/thing:2584426)
+Customized parts can be found [here](3D_files).\
+Gopro style mounting extension can be found on [Thingiverse](https://www.thingiverse.com/thing:2584426).
