@@ -1,5 +1,7 @@
 # Raspberry Pi BabyCam
 
+![](.assets/rpi_babyCam_front.jpg)
+
 # Installation
 ## Raspberry Pi:
 - Install the latest Pi OS lite 64bit
@@ -149,3 +151,8 @@ tailscale up
 - Enter the Local and if setup Remote URL (WebRTC recommended or HLS)
 - click `Save`
 - Swipe from left to right an select the right URL type
+
+# 3D printed Housing
+
+Customized parts can be found [here](3D_files)\
+Gopro style mounting extension can be found on [Thingiverse](https://www.thingiverse.com/thing:2584426)
