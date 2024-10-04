@@ -24,7 +24,7 @@ MediaMTX will now be downloaded. Which version you use depends on Raspbian versi
 uname -m
 ```
 - Visit https://github.com/bluenviron/mediamtx/releases for latest versions and download links.
-- Copy the link and enter in the terminal with wget prefix, below example I’m using the lattest (v1.9.0) 64bit version
+- Copy the link and enter in the terminal with wget prefix, below example I’m using the latest (v1.9.0) 64bit version
 ```
 wget https://github.com/bluenviron/mediamtx/releases/download/v1.9.0/mediamtx_v1.9.0_linux_arm64v8.tar.gz
 ```
@@ -64,9 +64,12 @@ paths:
   all_others:
 ```
 - The cam is now only running is someone is requesting the stream.
-- additional config parameter: https://github.com/bluenviron/mediamtx/blob/main/mediamtx.yml
+- additional config parameter: https://github.com/bluenviron/mediamtx/blob/main/mediamtx.yml starting at line [509](https://github.com/bluenviron/mediamtx/blob/df9f0f8cdb0e40344e11de9685e13da697a40f57/mediamtx.yml#L509)
 ### Example 
   ```
+  # Flip horizontally
+  rpiCameraHFlip: false
+  ...
   # Enables printing text on each frame.
   rpiCameraTextOverlayEnable: true
   # Text that is printed on each frame.
@@ -118,10 +121,18 @@ sudo systemctl status mediamtx
 
 ### Stream URL
 Local access only!
+
+Video only:
 ```
 VLC -> rtsp://{RPI IP-Address}:8554/cam
 WebRTC -> http://{RPI IP-Address}:8889/cam
 HLS -> http://{RPI IP-Address}:8888/cam
+```
+Video and Audio:
+```
+VLC -> rtsp://{RPI IP-Address}:8554/cam_with_audio
+WebRTC -> http://{RPI IP-Address}:8889/cam_with_audio
+HLS -> http://{RPI IP-Address}:8888/cam_with_audio
 ```
 You can also use the Pi hostname `PiCam.local` instead of IP Adress.
 
@@ -145,7 +156,7 @@ tailscale up
 
 # Setup Android APP:
 
-- Visit [BabyCam Google Drive](https://drive.google.com/drive/folders/15eSAh2_Q_ZZ81lj0tSRdt0VHG018Qh6l?usp=drive_link) to find the latest .apk
+- Visit [App](App) to find the latest .apk
 - Install the .apk
 - Swipe from left to right to open the side menu an click `Settings`
 - Enter the Local and if setup Remote URL (WebRTC recommended for low latency)
