@@ -32,11 +32,13 @@ wget https://github.com/bluenviron/mediamtx/releases/download/v1.9.0/mediamtx_v1
 ```
 tar xzvf mediamtx_v1.9.0_linux_arm64v8.tar.tar.gz
 ```
+### MediaMTX config
+**If you want to add Audio to the Stream please follow [Install Audio](#install-mediamtx-audio).**
 - Edit the yml file so it uses the Pi camera
 ```
 nano mediamtx.yml
 ```
-- Scroll to the bottom of the file, replace the following lines of code at the end of the file
+- Scroll to the bottom of the file, replace the following lines of code at the end of the file. 
 ```
 paths:
   # example:
@@ -63,6 +65,11 @@ paths:
 
   all_others:
 ```
+- enable audio by replacing `hw:0` with your corresponding audio source.
+```
+alsasrc device=default:CARD=Mic ! opusenc bitrate=16000 ! s.
+```
+
 - The cam is now only running is someone is requesting the stream.
 - additional config parameter: https://github.com/bluenviron/mediamtx/blob/main/mediamtx.yml starting at line [509](https://github.com/bluenviron/mediamtx/blob/df9f0f8cdb0e40344e11de9685e13da697a40f57/mediamtx.yml#L509)
 ### Example 
@@ -135,6 +142,42 @@ WebRTC -> http://{RPI IP-Address}:8889/cam_with_audio
 HLS -> http://{RPI IP-Address}:8888/cam_with_audio
 ```
 You can also use the Pi hostname `PiCam.local` instead of IP Adress.
+
+## Install MediaMTX Audio:
+In order to add audio from a USB microfone, install GStreamer and alsa-utils:
+```
+sudo apt install -y gstreamer1.0-tools gstreamer1.0-rtsp gstreamer1.0-alsa alsa-utils
+```
+List available audio cards with:
+```
+arecord -L
+```
+Example output:
+```
+null
+    Discard all samples (playback) or generate zero samples (capture)
+hw:CARD=Mic,DEV=0
+    Samson Go Mic, USB Audio
+    Direct hardware device without any conversions
+plughw:CARD=Mic,DEV=0
+    Samson Go Mic, USB Audio
+    Hardware device with all software conversions
+default:CARD=Mic
+    Samson Go Mic, USB Audio
+    Default Audio Device
+sysdefault:CARD=Mic
+    Samson Go Mic, USB Audio
+    Default Audio Device
+front:CARD=Mic,DEV=0
+    Samson Go Mic, USB Audio
+    Front output / input
+dsnoop:CARD=Mic,DEV=0
+    Samson Go Mic, USB Audio
+    Direct sample snooping device
+```
+- Look for the entry `default:`. In this example, `plughw:` also works well.
+- Note the device name `default:CARD=Mic`.
+- After you got the device instance continue with [Mediamtx config](#mediamtx-config).
 
 ## Setup Tailscale:
 With Tailscale remote access is easy to setup.
