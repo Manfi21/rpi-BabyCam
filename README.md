@@ -179,6 +179,22 @@ dsnoop:CARD=Mic,DEV=0
 - Note the device name `default:CARD=Mic`.
 - After you got the device instance continue with [Mediamtx config](#mediamtx-config).
 
+## Install BLE WiFi Setup
+We're using [Rpi-SetWiFi-viaBluetooth - Version 2](https://github.com/nksan/Rpi-SetWiFi-viaBluetooth/tree/main?tab=readme-ov-file).
+
+```
+curl  -L https://raw.githubusercontent.com/nksan/Rpi-SetWiFi-viaBluetooth/main/btwifisetInstall.sh | bash
+```
+
+Keep all Settings default. You can add a password if needed.
+
+To check the Status of the new service:
+```
+systemctl status btwifiset
+```
+
+You can now use the Wifi settings in the new App (Version >= v1.5.4)
+
 ## Setup Tailscale:
 With Tailscale remote access is easy to setup.
 
