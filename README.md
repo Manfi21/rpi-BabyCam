@@ -217,10 +217,20 @@ tailscale up
 
 - Visit [App](App) to find the latest .apk
 - Install the .apk
-- Swipe from left to right to open the side menu an click `Settings`
-- Enter the Local and if setup Remote URL (WebRTC recommended for low latency)
+- Click the blue button in the top right corner to open the menu an click settings icon
+- Enter the Local and if setup Remote IP without prot and suffx
+- Enter the port and suffix below (WebRTC recommended for low latency) (e.g. 8889/cam)
 - click `Save`
-- Swipe from left to right an select the right URL type
+- By clicking the blue button you can choose the right URL type
+
+### WiFi Settings
+- Click on found BLE device in the list.
+- After **sucessfull** connection you can `Get IP` or `Set Wifi`
+
+### SSH connection
+- the app will try both IPs for an SSH connection.
+- Just click on `Auto Connect` and enter the credentials.
+- after that you can `Reboot` `Shutdown` and send a `Custom command` with visual response.
 
 # 3D printed Housing
 
