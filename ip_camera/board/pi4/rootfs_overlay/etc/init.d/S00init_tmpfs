@@ -1,0 +1,8 @@
+#!/bin/sh
+
+for dir in  /var/run /var/lock /var/log /var/empty /var/lib/seedrng
+do
+    mkdir -p "$dir"
+done
+
+mount -t vfat /dev/mmcblk0p1 /boot 2>/dev/null || echo "WARN: /boot not mounted"

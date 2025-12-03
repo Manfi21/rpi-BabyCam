@@ -1,0 +1,48 @@
+state.Device {
+	control.1 {
+		iface PCM
+		name 'Capture Channel Map'
+		value 2
+		comment {
+			access 'read volatile'
+			type INTEGER
+			count 1
+			range '0 - 36'
+		}
+	}
+	control.2 {
+		iface MIXER
+		name 'Mic Capture Switch'
+		value true
+		comment {
+			access 'read write'
+			type BOOLEAN
+			count 1
+		}
+
+	}
+	control.3 {
+		iface MIXER
+		name 'Mic Capture Volume'
+		value 16
+		comment {
+			access 'read write'
+			type INTEGER
+			count 1
+			range '0 - 16'
+			dbmin 0
+			dbmax 2381
+			dbvalue.0 2381
+		}
+	}
+	control.4 {
+		iface MIXER
+		name 'Auto Gain Control'
+		value true
+		comment {
+			access 'read write'
+			type BOOLEAN
+			count 1
+		}
+	}
+}
