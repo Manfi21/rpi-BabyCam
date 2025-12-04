@@ -277,16 +277,18 @@ def system_control():
         return jsonify({'status': 'Shutting down...'})
     elif action == 'update_mediamtx':
         try:
-            os.system("/root/mediamtx --update")
-        except:
-            pass
-        return jsonify({'status': 'update mediamtx'})
+            result = run_command("/root/mediamtx --upgrade", timeout=None)
+            # print(result)
+            run_command("/etc/init.d/S99start_mediamtx restart")
+            return jsonify({'message': result})
+        except Exception as e:
+            return jsonify({'message': f'Error: {e}'})
     elif action == 'update_webserver':
         try:
-            os.system("echo 'update curl from github?'")
-        except:
-            pass
-        return jsonify({'status': 'update webserver'})
+            result = run_command("echo 'update curl from github?'", timeout=None)
+            return jsonify({'message': result})
+        except Exception as e:
+            return jsonify({'message': f'Error: {e}'})
     return jsonify({'status': 'Unknown command'}), 400
 
 # -----------------------
