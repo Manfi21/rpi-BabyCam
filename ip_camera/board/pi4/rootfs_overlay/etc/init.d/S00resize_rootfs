@@ -1,0 +1,15 @@
+#!/bin/sh
+
+FIRSTBOOT="/root/.firstboot_done"
+
+[ -f "$FIRSTBOOT" ] && exit 0
+
+parted -s /dev/mmcblk0 u s resizepart 2 100%
+
+echo "Expanding root filesystem on $ROOT_DEV..."
+resize2fs /dev/mmcblk0
+
+# Just for the first time boot
+touch "$FIRSTBOOT"
+echo "Root filesystem resized."
+reboot
