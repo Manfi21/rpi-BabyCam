@@ -32,7 +32,7 @@ jobs:
 
       # Artifact hochladen
       - name: Upload SD card image
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: pi4_babycam_sdcard
           path: build/pi4_babycam/images/sdcard.img
