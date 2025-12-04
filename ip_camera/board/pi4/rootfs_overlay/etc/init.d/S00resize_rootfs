@@ -7,7 +7,7 @@ FIRSTBOOT="/root/.firstboot_done"
 parted -s /dev/mmcblk0 u s resizepart 2 100%
 
 echo "Expanding root filesystem on $ROOT_DEV..."
-resize2fs /dev/mmcblk0
+resize2fs /dev/mmcblk0p2
 
 # Just for the first time boot
 touch "$FIRSTBOOT"
