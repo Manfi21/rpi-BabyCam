@@ -185,7 +185,7 @@
     <div class="card">
         <h2>⚡ System</h2>
         <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-            <button class="btn-green" style="flex: 1;" onclick="sys('update_mediamtx')">Update camera server</button>
+            <button class="btn-green" style="flex: 1;" onclick="sys('update_mediamtx')">Update Cameraserver</button>
             <button class="btn-green" style="flex: 1;" onclick="sys('update_webserver')">Update Webserver</button>
         </div>
         <div style="display: flex; gap: 10px;">
@@ -329,7 +329,12 @@
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({action: action})
-                    }).then(() => showMessage(`Requested: ${action}.`));
+                    })
+                    .then(response => response.json())       // Antwort als JSON auslesen
+                    .then(data => {
+                        showMessage(`Server response: ${data.message}`);
+                    })
+                    .catch(err => showMessage(`Error: ${err}`));
                 }
             });
         }

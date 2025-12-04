@@ -4,6 +4,7 @@ import subprocess
 import os
 import requests
 import json
+import time
 
 app = Flask(__name__)
 
@@ -14,9 +15,9 @@ RPI_PREFIX = "rpi"
 # -----------------------
 # Helper functions
 # -----------------------
-def run_command(command):
+def run_command(command, timeout=5):
     try:
-        result = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT, timeout=5)
+        result = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT, timeout=timeout)
         return result.decode('utf-8', errors='ignore').strip()
     except subprocess.CalledProcessError as e:
         return e.output.decode('utf-8', errors='ignore').strip()
@@ -243,7 +244,16 @@ def connect_wifi():
             with open(filename, "w") as f:
                 f.write(f"[Security]\nPassphrase={password}\n")
 
-            os.system("/sbin/reboot &")
+            print(run_command("/etc/init.d/S41wifi_ap_fallback stop"))
+            print(run_command("/etc/init.d/S40iwd stop"))
+            time.sleep(2)
+            print(run_command("ip addr flush dev wlan0"))
+            print(run_command("/etc/init.d/S40iwd start"))
+            print(run_command("/etc/init.d/S40network restart", timeout=20))
+            print(run_command("ip neigh flush all"))
+            print(run_command("ifconfig wlan0 down"))
+            print(run_command("ifconfig wlan0 up"))
+            print("New Network set.")
 
         return jsonify({'status': 'success', 'message': f'Connecting to {ssid}.'})
     except Exception as e:
