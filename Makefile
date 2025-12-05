@@ -1,4 +1,3 @@
-# Load previous project configuration if available
 -include .project_config
 
 .project_config: ;
@@ -8,15 +7,13 @@ export BR2_GLOBAL_PATCH_DIR += $(realpath ip_camera/patches)
 
 .DEFAULT_GOAL := all
 
-
-ifneq ($(filter set-project-%,$(MAKECMDGOALS)),)
+ifeq ($(filter set-project-%,$(MAKECMDGOALS)),)
 # continue
 else
 ifeq ($(strip $(EXTERNAL_BUILD_DIR)),)
 $(error EXTERNAL_BUILD_DIR is not set! Please run 'make set-project-<name>' first.)
 endif
 endif
-
 
 %:
 	$(MAKE) -C buildroot O=../build/$(EXTERNAL_BUILD_DIR) $@
