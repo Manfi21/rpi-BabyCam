@@ -52,6 +52,14 @@ def get_ip_address():
     except Exception:
         return "No IP"
 
+def get_ip_tailscale_address()
+    try:
+        ip = run_command("ip -4 addr show tailscale0 | grep inet | awk '{print $2}' | cut -d/ -f1 | head -n 1")
+        if ip:
+            return ip
+        return "Not connected"
+    except Exception:
+        return "Not connected"
 
 # -----------------------
 # MediaMTX API
@@ -347,6 +355,7 @@ def settings_page():
 
     ip = get_ip_address()
     ssid = get_current_ssid()
+    ip_tailscale = get_ip_tailscale_address()
     mediamtx_config = {'path_cam': path_cam_filtered}
 
     return render_template(
