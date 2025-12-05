@@ -362,6 +362,7 @@ def settings_page():
         'settings.html',
         ip=ip,
         ssid=ssid,
+        ip_tailscale=ip_tailscale,
         stream_postfix=stream_postfix,
         mediamtx_config=mediamtx_config
     )
