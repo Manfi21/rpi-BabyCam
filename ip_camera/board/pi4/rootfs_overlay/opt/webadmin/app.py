@@ -52,7 +52,7 @@ def get_ip_address():
     except Exception:
         return "No IP"
 
-def get_ip_tailscale_address()
+def get_ip_tailscale_address():
     try:
         ip = run_command("ip -4 addr show tailscale0 | grep inet | awk '{print $2}' | cut -d/ -f1 | head -n 1")
         if ip:
