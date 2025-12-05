@@ -184,13 +184,24 @@
     </div>
     <div class="card">
         <h2>⚡ System</h2>
-        <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-            <button class="btn-green" style="flex: 1;" onclick="sys('update_mediamtx')">Update Cameraserver</button>
-            <button class="btn-green" style="flex: 1;" onclick="sys('update_webserver')">Update Webserver</button>
-        </div>
         <div style="display: flex; gap: 10px;">
             <button class="btn-red" style="flex: 1;" onclick="sys('reboot')">Reboot</button>
             <button class="btn-red" style="flex: 1;" onclick="sys('poweroff')">Shutdown</button>
+        </div>
+        <h3 class="toggle-header" onclick="toggleConfig('settingsWrapper', 'settingsToggle')">
+            <span>Advanced settings</span>
+            <span id="settingsToggle" class="toggle-icon collapsed">▼</span>
+        </h3>
+        <div id="settingsWrapper" style="display:none;">
+            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                <button class="btn-blue" style="flex: 1;" onclick="sys_stream('update_mediamtx')">Update Camera Server</button>
+                <button class="btn-blue" style="flex: 1;" onclick="sys_stream('update_webserver')">Update Webserver</button>
+            </div>
+            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                <button class="btn-blue" style="flex: 1;" onclick="sys_stream('setup_tailscale')">Setup Tailscale</button>
+                <button class="btn-blue" style="flex: 1;" onclick="sys_stream('restart_cameraserver')">Restart Camera Server</button>
+                <button class="btn-blue" style="flex: 1;" onclick="sys_stream('restart_webserver')">Restart Webserver</button>
+            </div>
         </div>
     </div>
     <!-- Custom Modal HTML -->
@@ -202,6 +213,20 @@
                 <button id="modalCancelBtn" class="btn-red" style="display:none;">Cancel</button>
                 <button id="modalOkBtn" class="btn-blue">OK</button>
             </div>
+        </div>
+    </div>
+    <div id="streamModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 600px;">
+            <h3>Live Output</h3>
+            <pre id="streamOutput" style="
+                background:#111;
+                padding:10px;
+                height:300px;
+                overflow-y:auto;
+                color:#0f0;
+                border:1px solid #444;
+            "></pre>
+            <button class="btn-blue" onclick="closeStream()">Close</button>
         </div>
     </div>
     <script id="pathCamRawJson" type="application/json">
@@ -322,22 +347,65 @@
             };
             modal.style.display = 'flex';
         }
+        let streamSource = null;
+
+        function openStream() {
+            document.getElementById('streamOutput').innerText = "";
+            document.getElementById('streamModal').style.display = 'flex';
+        }
+
+        function closeStream() {
+            if (streamSource) {
+                streamSource.close();
+                streamSource = null;
+            }
+            document.getElementById('streamModal').style.display = 'none';
+        }
+
         function sys(action) {
-            showConfirmation(`System ${action}?`, (confirmed) => {
-                if (confirmed) {
-                    fetch('/api/system', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({action: action})
-                    })
-                    .then(response => response.json())       // Antwort als JSON auslesen
-                    .then(data => {
-                        showMessage(`Server response: ${data.message}`);
-                    })
-                    .catch(err => showMessage(`Error: ${err}`));
-                }
+            showConfirmation(`System ${action}?`, confirmed => {
+                if (!confirmed) return;
+
+                fetch('/api/system', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({action: action})
+                })
+                .then(res => res.json())
+                .then(data => showMessage(data.status || "Done"));
             });
         }
+        function sys_stream(action) {
+            document.getElementById("streamOutput").innerText = "";
+            document.getElementById("streamModal").style.display = "flex";
+
+            // vorherigen Stream schließen
+            if (streamSource) {
+                streamSource.close();
+                streamSource = null;
+            }
+
+            // Stream starten (GET mit Query)
+            streamSource = new EventSource("/api/system/stream?action=" + action);
+
+            // Live Output
+            streamSource.onmessage = (event) => {
+                const out = document.getElementById("streamOutput");
+                out.textContent += event.data + "\n";
+                out.scrollTop = out.scrollHeight;
+
+                if (event.data.includes("--- DONE ---")) {
+                    streamSource.close();
+                }
+            };
+
+            streamSource.onerror = () => {
+                const out = document.getElementById("streamOutput");
+                out.textContent += "\n[Connection closed]\n";
+                streamSource.close();
+            };
+        }
+
         window.onload = function() {
             localStorage.removeItem('stream_postfix');
         }

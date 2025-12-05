@@ -1,5 +1,5 @@
 import json
-from flask import Flask, render_template, request, jsonify, redirect, url_for
+from flask import Flask, render_template, request, jsonify, redirect, url_for, Response
 import subprocess
 import os
 import requests
@@ -275,21 +275,42 @@ def system_control():
         except:
             pass
         return jsonify({'status': 'Shutting down...'})
-    elif action == 'update_mediamtx':
-        try:
-            result = run_command("/root/mediamtx --upgrade", timeout=None)
-            # print(result)
-            run_command("/etc/init.d/S99start_mediamtx restart")
-            return jsonify({'message': result})
-        except Exception as e:
-            return jsonify({'message': f'Error: {e}'})
-    elif action == 'update_webserver':
-        try:
-            result = run_command("echo 'update curl from github?'", timeout=None)
-            return jsonify({'message': result})
-        except Exception as e:
-            return jsonify({'message': f'Error: {e}'})
     return jsonify({'status': 'Unknown command'}), 400
+
+@app.route('/api/system/stream', methods=['GET'])
+def system_stream():
+    action = request.args.get('action', '')  # GET-Parameter statt JSON
+    commands = {
+        "update_mediamtx": "/root/mediamtx --upgrade",
+        "update_webserver": "echo 'update curl from github?'",
+        "setup_tailscale": "tailscale up",
+        "restart_cameraserver": "/etc/init.d/S99start_mediamtx restart",
+        "restart_webserver": "/etc/init.d/S99webadmin restart"
+    }
+
+    if action not in commands:
+        return "event: message\ndata: Unknown action\n\n", 400
+
+    cmd = commands[action]
+
+    def generate():
+        try:
+            process = subprocess.Popen(
+                cmd,
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True
+            )
+            for line in process.stdout:
+                yield f"data: {line.rstrip()}\n\n"
+                # print(f"data: {line.rstrip()}\n\n")
+            process.wait()
+            yield "data: --- DONE ---\n\n"
+        except Exception as e:
+            yield f"data: ERROR: {str(e)}\n\n"
+
+    return Response(generate(), mimetype='text/event-stream')
 
 # -----------------------
 # HTML-Sites

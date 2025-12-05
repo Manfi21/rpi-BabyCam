@@ -9,6 +9,8 @@ start() {
   sysctl net.core.rmem_max=100000000
   ldconfig
   start-stop-daemon -S -b -m -p "$PIDFILE" -O "$LOGFILE" --exec "$START_CMD" -- "/root/mediamtx.yml"
+  sleep 1
+  status
 }
 
 stop() {
