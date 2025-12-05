@@ -1,0 +1,56 @@
+#!/bin/sh
+SERVICE_NAME="mediamtx"
+START_CMD="/root/mediamtx"
+LOGFILE="/var/log/mediamtx.log"
+PIDFILE="/var/run/mediamtx.pid"
+
+start() {
+  echo "Starting mediamtx server..."
+  sysctl net.core.rmem_max=100000000
+  ldconfig
+  start-stop-daemon -S -b -m -p "$PIDFILE" -O "$LOGFILE" --exec "$START_CMD" -- "/root/mediamtx.yml"
+  sleep 1
+  status
+}
+
+stop() {
+  echo "Stopping mediamtx"
+  start-stop-daemon -K -p "$PIDFILE"
+}
+
+status() {
+  if pgrep $SERVICE_NAME > /dev/null; then
+      echo "Mediamtx is running"
+    else
+      echo "Mediamtx is not running"
+  fi
+}
+
+restart() {
+  stop
+  sleep 1
+  start
+}
+
+case "$1" in
+  start)
+    shift
+    start
+    ;;
+  stop)
+    stop
+    ;;
+  status)
+    status
+    ;;
+  restart)
+    shift
+    restart
+    ;;
+  *)
+    echo "Usage: $0 {start|stop|status|restart}"
+    exit 1
+    ;;
+esac
+
+exit 0

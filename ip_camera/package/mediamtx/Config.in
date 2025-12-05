@@ -1,0 +1,5 @@
+config BR2_PACKAGE_MEDIAMTX
+    bool "MediaMTX"
+    help
+      MediaMTX is a lightweight, high-performance media server (WebRTC, RTSP, RTMP).
+      https://github.com/bluenviron/mediamtx

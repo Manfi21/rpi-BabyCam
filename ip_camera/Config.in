@@ -1,0 +1,5 @@
+menu "ip_camera additional aackages"
+
+source "$BR2_EXTERNAL_IP_CAMERA_PATH/package/mediamtx/Config.in"
+
+endmenu

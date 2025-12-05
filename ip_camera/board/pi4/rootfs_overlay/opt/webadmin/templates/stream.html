@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BabyCam Stream</title>
+    <style>
+        body {
+            margin: 0;
+            background: #000;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+/*             overflow: hidden; */
+        }
+        #streamFrame {
+            /* Iframe fill all */
+            flex: 1;
+            width: 100%;
+            border: none;
+        }
+
+        .controls {
+            /* Button top right corner */
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .btn {
+            background: rgba(0,0,0,0.5);
+            color: white;
+            border: 1px solid white;
+            padding: 10px 15px;
+            border-radius: 20px;
+            text-decoration: none;
+            font-family: sans-serif;
+            cursor: pointer;
+            user-select: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <a href="/settings" class="btn">⚙️ Settings</a>
+    </div>
+    <iframe id="streamFrame" allow="autoplay; fullscreen"></iframe>
+    <script>
+        const host = window.location.hostname;
+        let postfix = localStorage.getItem('stream_postfix') || "{{ stream_postfix or '/cam' }}";
+        document.getElementById('streamFrame').src = "http://" + host + ":8889" + postfix + "?muted=0";
+    </script>
+</body>
+</html>

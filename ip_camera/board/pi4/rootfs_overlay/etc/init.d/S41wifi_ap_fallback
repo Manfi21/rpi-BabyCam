@@ -1,0 +1,64 @@
+#!/bin/sh
+
+IWD_BIN="/usr/libexec/iwd"
+WLAN_IF="wlan0"
+AP_IP="192.168.4.1"
+AP_SSID="PI_BabyCam"
+AP_PASS="babycam123"
+
+check_wifi_connected() {
+    ip addr show $WLAN_IF | grep -q "inet " && ! ip addr show $WLAN_IF | grep -q "$AP_IP"
+}
+
+stop_ap() {
+    killall hostapd 2>/dev/null
+    killall dnsmasq 2>/dev/null
+}
+
+start_ap() {
+    echo "[AP] Starting hotspot..."
+
+    # Stop any station-mode connection
+    iwctl station $WLAN_IF disconnect 2>/dev/null
+
+    # Reset interface
+    ip link set $WLAN_IF down
+    ip addr flush dev $WLAN_IF
+    ip addr add $AP_IP/24 dev $WLAN_IF
+    ip link set $WLAN_IF up
+
+    sleep 1
+
+    # Write temporary hostapd config
+    HOSTAPD_CONF="/etc/hostapd.conf"
+    hostapd $HOSTAPD_CONF -B
+
+    # Start dnsmasq
+    dnsmasq -C /etc/dnsmasq.conf
+
+    echo "[AP] Hotspot started: $AP_SSID"
+}
+
+case "$1" in
+    start)
+        stop_ap
+        sleep 5
+        if check_wifi_connected; then
+            echo "[WIFI] Connection detected. No hotspot needed."
+        else
+            echo "[WIFI] No connection. Falling back to hotspot."
+            start_ap
+        fi
+        ;;
+    stop)
+        stop_ap
+        ;;
+    restart)
+        stop
+        start
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart}"
+        exit 1
+esac
+exit 0

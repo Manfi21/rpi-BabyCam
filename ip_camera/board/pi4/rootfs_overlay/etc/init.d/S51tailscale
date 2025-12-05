@@ -1,0 +1,74 @@
+#!/bin/sh
+
+NAME="tailscaled"
+DAEMON="/usr/sbin/$NAME"
+PIDFILE="/var/run/$NAME.pid"
+
+start() {
+    echo -n "Waiting for /dev/net/tun..."
+    COUNTER=0
+    MAX_ATTEMPTS=6
+    mkdir -p /dev/net
+    [ ! -e /dev/net/tun ] && mknod /dev/net/tun c 10 200
+
+    while [ ! -c /dev/net/tun ]; do
+        if [ $COUNTER -ge $MAX_ATTEMPTS ]; then
+            echo " Timeout. TUN-Device missing. Tailscale not stated"
+            return 1
+        fi
+        sleep 5
+        COUNTER=$((COUNTER + 1))
+        echo -n "."
+    done
+    echo " Done."
+    sleep 2
+
+    mkdir -p /var/run/tailscale
+    mkdir -p /var/lib/tailscale
+    chmod 0700 /var/lib/tailscale
+
+    echo -n "Starting $NAME: "
+
+    start-stop-daemon -S -b -m -p $PIDFILE --exec $DAEMON -- \
+        -state=/var/lib/tailscale/tailscaled.state \
+        -socket=/var/run/tailscale/tailscaled.sock \
+        || echo "Error"
+
+    echo "$NAME started"
+}
+
+stop() {
+    echo -n "Stopping $NAME: "
+    start-stop-daemon --stop --quiet --oknodo --pidfile $PIDFILE
+    echo "$NAME stopped"
+}
+
+status() {
+    if [ -f $PIDFILE ] && kill -0 $(cat $PIDFILE) 2>/dev/null; then
+        echo "$NAME running (PID $(cat $PIDFILE))."
+    else
+        echo "$NAME not running."
+        return 1
+    fi
+}
+
+case "$1" in
+    start)
+        start
+        ;;
+    stop)
+        stop
+        ;;
+    status)
+        status
+        ;;
+    restart)
+        stop
+        start
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|status|restart}"
+        exit 1
+esac
+
+exit 0

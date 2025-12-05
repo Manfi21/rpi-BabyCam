@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings</title>
+    <style>
+        body { font-family: sans-serif; background: #222; color: #eee; padding: 20px; max-width: 600px; margin: 0 auto; }
+        .card { background: #333; padding: 15px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); }
+        h2 { margin-top: 0; border-bottom: 1px solid #555; padding-bottom: 10px; }
+        label { display: block; margin-top: 10px; font-weight: bold; }
+        input { width: 100%; padding: 10px; margin-top: 5px; box-sizing: border-box; background: #444; border: 1px solid #555; color: white; border-radius: 4px; }
+        button { width: 100%; padding: 12px; margin-top: 15px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: bold; transition: background-color 0.2s; }
+        .btn-blue { background: #007bff; color: white; }
+        .btn-blue:hover { background: #0056b3; }
+        .btn-green { background: #28a745; color: white; }
+        .btn-green:hover { background: #1e7e34; }
+        .btn-red { background: #dc3545; color: white; }
+        .btn-red:hover { background: #c82333; }
+        .wifi-list { max-height: 200px; overflow-y: auto; background: #444; margin-top: 10px; border-radius: 4px; }
+        .wifi-item { padding: 10px; border-bottom: 1px solid #555; cursor: pointer; }
+        .wifi-item:hover { background: #555; }
+        .back-link { display: inline-block; margin-bottom: 20px; color: #aaa; text-decoration: none; }
+        .info-row { display: flex; justify-content: space-between; margin-bottom: 5px; padding: 5px 0; border-bottom: 1px dotted #444; }
+        .info-row strong { color: #007bff; }
+        .config-list, .config-array {
+            list-style: none;
+            padding-left: 15px;
+            margin: 5px 0;
+            border-left: 2px solid #555;
+        }
+        .config-item { margin-bottom: 3px; }
+        .config-key { color: #ccc; font-weight: 500; font-size: 0.9em; }
+        .config-value { color: #28a745; font-family: monospace; }
+        .config-list .config-list { border-left-color: #777; }
+        .config-editor {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            font-family: monospace;
+            font-size: 0.9em;
+            background: #2b2b2b;
+            border: 1px solid #555;
+            color: #f8f8f2;
+            border-radius: 4px;
+            resize: vertical;
+        }
+
+        .toggle-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            padding: 5px 0;
+            border-bottom: 1px solid #444;
+            margin-top: 10px;
+        }
+        .toggle-icon {
+            transition: transform 0.2s;
+            font-size: 1.2em;
+        }
+        .toggle-icon.collapsed {
+            transform: rotate(0deg);
+        }
+        .toggle-icon.expanded {
+            transform: rotate(180deg);
+        }
+        .error-message { background: #dc354530; color: #dc3545; padding: 10px; border-radius: 4px; border: 1px solid #dc3545; margin-top: 10px; }
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background: #333;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+            width: 90%;
+            max-width: 350px;
+        }
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .modal-buttons button {
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+    <a href="/" class="back-link">← Back to Stream</a>
+    {% if message %}
+        <div class="message">{{ message }}</div>
+    {% endif %}
+    <div class="card">
+        <h2>ℹ️ Status</h2>
+        <div class="info-row"><span>WIFI (SSID):</span> <strong>{{ ssid }}</strong></div>
+        <div class="info-row"><span>IP Adress:</span> <strong>{{ ip }}</strong></div>
+    </div>
+    <div class="card">
+        <h2>📶 Wifi Settings</h2>
+        <div id="wifiStatusMessage" style="padding: 10px; margin-bottom: 15px; display: none;"></div>
+        <div id="scanMode">
+            <button class="btn-blue" onclick="scanWifi()" id="scanBtn">🔍 Network scan</button>
+            <div id="wifiList" class="wifi-list" style="display:none;"></div>
+            <div id="connectForm" style="display:none; margin-top: 15px; border-top: 1px solid #555; padding-top: 10px;">
+                <label>Connect to network:</label>
+                <input type="text" id="ssidInput" readonly>
+                <label>Password:</label>
+                <input type="password" id="pwInput" placeholder="Wifi PSK">
+                <button class="btn-green" onclick="connectWifi()">Connect</button>
+            </div>
+        </div>
+        <div id="manualMode" style="display: none;">
+            <p style="font-size: 0.9em; color: #aaa;">
+                ⚠️ **Scan failed.** Please type in SSID and password.
+            </p>
+
+            <label for="manualSsidInput">WIFI SSID:</label>
+            <input type="text" id="manualSsidInput" placeholder="SSID" required>
+
+            <label for="manualPwInput">Password:</label>
+            <input type="password" id="manualPwInput" placeholder="WIFI PSK" required>
+
+            <button class="btn-green" onclick="configureManualWifi()">
+                Save Network & restart
+            </button>
+        </div>
+    </div>
+    <div class="card">
+        <h2>🎬 Stream Postfix</h2>
+        <form action="/settings" method="POST" onsubmit="savePostfixToLocal()">
+            <label for="streamPostfixInput">Postfix:</label>
+            <input type="text" name="stream_postfix" id="streamPostfixInput" value="{{ stream_postfix }}">
+            <button class="btn-blue" type="submit">Save</button>
+        </form>
+    </div>
+
+    <script>
+        function savePostfixToLocal() {
+            let postfix = document.getElementById('streamPostfixInput').value.trim();
+            if (!postfix.startsWith("/")) postfix = "/" + postfix;
+            localStorage.setItem("stream_postfix", postfix);
+        }
+    </script>
+    <!-- KARTE FÜR MEDIA MTX KONFIGURATION -->
+    <div class="card">
+        <h2 class="toggle-header" onclick="toggleConfig('mediamtxConfig', 'mediamtxToggle')">
+            <span>⚙️ MediaMTX configuration</span>
+            <span id="mediamtxToggle" class="toggle-icon collapsed">▼</span>
+        </h2>
+        <div id="mediamtxConfig" style="display:none;">
+            <div class="toggle-header" onclick="toggleConfig('pathCamConfigWrapper', 'pathCamToggle')" style="margin-bottom: 5px;">
+                <h3 style="margin: 0;">'cam' path settings</h3>
+                <span id="pathCamToggle" class="toggle-icon collapsed">▼</span>
+            </div>
+            <div id="pathCamConfigWrapper" style="display:none; padding-left: 5px; border-left: 2px solid #555;">
+                {% if mediamtx_config.path_cam.error %}
+                    <div class="error-message">{{ mediamtx_config.path_cam.error }}</div>
+                {% else %}
+                    <div id="pathCamDisplay">
+                        <div style="margin-bottom: 10px;">
+                            <button class="btn-blue" onclick="toggleEdit('pathCam')">Change config</button>
+                        </div>
+                        {{ format_dict_for_html(mediamtx_config.path_cam) | safe }}
+                    </div>
+                    <div id="pathCamEdit" style="display:none;">
+                        <label for="pathCamConfigRaw">Config:</label>
+                        <textarea id="pathCamConfigRaw" rows="10" class="config-editor"></textarea>
+                        <div style="display: flex; gap: 10px;">
+                            <button class="btn-green" style="flex-grow: 1;" onclick="saveConfig('pathCam')">Save (PATCH)</button>
+                            <button class="btn-red" style="flex-grow: 1;" onclick="toggleEdit('pathCam')">Cancel</button>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="card">
+        <h2>⚡ System</h2>
+        <div style="display: flex; gap: 10px;">
+            <button class="btn-red" style="flex: 1;" onclick="sys('reboot')">Reboot</button>
+            <button class="btn-red" style="flex: 1;" onclick="sys('poweroff')">Shutdown</button>
+        </div>
+        <h3 class="toggle-header" onclick="toggleConfig('settingsWrapper', 'settingsToggle')">
+            <span>Advanced settings</span>
+            <span id="settingsToggle" class="toggle-icon collapsed">▼</span>
+        </h3>
+        <div id="settingsWrapper" style="display:none;">
+            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                <button class="btn-blue" style="flex: 1;" onclick="sys_stream('update_mediamtx')">Update Camera Server</button>
+                <button class="btn-blue" style="flex: 1;" onclick="sys_stream('update_webserver')">Update Webserver</button>
+            </div>
+            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                <button class="btn-blue" style="flex: 1;" onclick="sys_stream('setup_tailscale')">Setup Tailscale</button>
+                <button class="btn-blue" style="flex: 1;" onclick="sys_stream('restart_cameraserver')">Restart Camera Server</button>
+                <button class="btn-blue" style="flex: 1;" onclick="sys_stream('restart_webserver')">Restart Webserver</button>
+            </div>
+        </div>
+    </div>
+    <!-- Custom Modal HTML -->
+    <div id="customModal" class="modal-overlay">
+        <div class="modal-content">
+            <p id="modalMessage"></p>
+            <div class="modal-buttons">
+                <button id="modalConfirmBtn" class="btn-green" style="display:none;">Yes</button>
+                <button id="modalCancelBtn" class="btn-red" style="display:none;">Cancel</button>
+                <button id="modalOkBtn" class="btn-blue">OK</button>
+            </div>
+        </div>
+    </div>
+    <div id="streamModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 600px;">
+            <h3>Live Output</h3>
+            <pre id="streamOutput" style="
+                background:#111;
+                padding:10px;
+                height:300px;
+                overflow-y:auto;
+                color:#0f0;
+                border:1px solid #444;
+            "></pre>
+            <button class="btn-blue" onclick="closeStream()">Close</button>
+        </div>
+    </div>
+    <script id="pathCamRawJson" type="application/json">
+        {{ mediamtx_config.path_cam | tojson | safe }}
+    </script>
+    <script>
+        function toggleConfig(contentId, iconId) {
+            const content = document.getElementById(contentId);
+            const icon = document.getElementById(iconId);
+            if (content.style.display === 'none' || content.style.display === '') {
+                content.style.display = 'block';
+                icon.classList.remove('collapsed');
+                icon.classList.add('expanded');
+            } else {
+                content.style.display = 'none';
+                icon.classList.remove('expanded');
+                icon.classList.add('collapsed');
+            }
+        }
+        function toggleEdit(configType) {
+            const displayDiv = document.getElementById(configType + 'Display');
+            const editDiv = document.getElementById(configType + 'Edit');
+            const textArea = document.getElementById(configType + 'ConfigRaw');
+            if (displayDiv.style.display !== 'none') {
+                displayDiv.style.display = 'none';
+                editDiv.style.display = 'block';
+                const rawJsonElement = document.getElementById(configType + 'RawJson');
+                if (rawJsonElement) {
+                     try {
+                         const rawJson = rawJsonElement.textContent.trim();
+                         const parsed = JSON.parse(rawJson);
+                         textArea.value = JSON.stringify(parsed, null, 4);
+                     } catch (e) {
+                         console.error("Error loading JSON into editor:", e);
+                         textArea.value = '{"error": "loading JSON into editor."}';
+                         showMessage(`Error config file for ${configType}.`, true);
+                     }
+                } else {
+                     textArea.value = '{"error": "JSON not found."}';
+                     showMessage(`Error: JSON for ${configType} not found.`, true);
+                }
+            } else {
+                editDiv.style.display = 'none';
+                displayDiv.style.display = 'block';
+            }
+        }
+        async function saveConfig(configType) {
+            const textArea = document.getElementById(configType + 'ConfigRaw');
+            const jsonString = textArea.value;
+            let configData;
+            try {
+                configData = JSON.parse(jsonString);
+            } catch (e) {
+                showMessage('Invalid JSON format', true);
+                return;
+            }
+            // API Endpunkt bestimmen
+            let apiEndpoint = '';
+            if (configType === 'global') {
+                apiEndpoint = '/api/mediamtx/global'; // Proxied to /v3/config/global/set
+            } else if (configType === 'pathCam') {
+                apiEndpoint = '/api/mediamtx/cam'; // Proxied to /v3/config/paths/set/cam
+            } else {
+                showMessage('Unkown config type.', true);
+                return;
+            }
+            try {
+                showMessage(`Set new config (${configType})...`);
+                const response = await fetch(apiEndpoint, {
+                    method: 'PATCH',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(configData)
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    showMessage(`Config (${configType}) saved successfully. Website will be reloaded.`);
+                    toggleEdit(configType);
+                    setTimeout(() => window.location.reload(), 2000);
+                } else {
+                    let errorDetails = result.error || JSON.stringify(result);
+                    showMessage(`Error saving config (${configType}): ${errorDetails}`, true);
+                }
+            } catch (e) {
+                console.error("API Fetch Error:", e);
+                showMessage('Networkerror while sending new config. Server is reachable?', true);
+            }
+        }
+        const modal = document.getElementById('customModal');
+        const modalMessage = document.getElementById('modalMessage');
+        const modalConfirmBtn = document.getElementById('modalConfirmBtn');
+        const modalCancelBtn = document.getElementById('modalCancelBtn');
+        const modalOkBtn = document.getElementById('modalOkBtn');
+
+        function showMessage(message, isError = false) {
+            modalMessage.innerHTML = message;
+            modalMessage.style.color = isError ? '#dc3545' : '#eee';
+            modalConfirmBtn.style.display = 'none';
+            modalCancelBtn.style.display = 'none';
+            modalOkBtn.style.display = 'block';
+            modalOkBtn.onclick = () => modal.style.display = 'none';
+            modal.style.display = 'flex';
+        }
+
+        function showConfirmation(message, callback) {
+            modalMessage.innerHTML = message;
+            modalMessage.style.color = '#eee';
+            modalOkBtn.style.display = 'none';
+            modalConfirmBtn.style.display = 'block';
+            modalCancelBtn.style.display = 'block';
+
+            modalConfirmBtn.onclick = () => {
+                modal.style.display = 'none';
+                callback(true);
+            };
+            modalCancelBtn.onclick = () => {
+                modal.style.display = 'none';
+                callback(false);
+            };
+            modal.style.display = 'flex';
+        }
+        let streamSource = null;
+
+        function openStream() {
+            document.getElementById('streamOutput').innerText = "";
+            document.getElementById('streamModal').style.display = 'flex';
+        }
+
+        function closeStream() {
+            if (streamSource) {
+                streamSource.close();
+                streamSource = null;
+            }
+            document.getElementById('streamModal').style.display = 'none';
+        }
+
+        function sys(action) {
+            showConfirmation(`System ${action}?`, confirmed => {
+                if (!confirmed) return;
+
+                fetch('/api/system', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({action: action})
+                })
+                .then(res => res.json())
+                .then(data => showMessage(data.status || "Done"));
+            });
+        }
+        function sys_stream(action) {
+            document.getElementById("streamOutput").innerText = "";
+            document.getElementById("streamModal").style.display = "flex";
+
+            // vorherigen Stream schließen
+            if (streamSource) {
+                streamSource.close();
+                streamSource = null;
+            }
+
+            // Stream starten (GET mit Query)
+            streamSource = new EventSource("/api/system/stream?action=" + action);
+
+            // Live Output
+            streamSource.onmessage = (event) => {
+                const out = document.getElementById("streamOutput");
+                out.textContent += event.data + "\n";
+                out.scrollTop = out.scrollHeight;
+
+                if (event.data.includes("--- DONE ---")) {
+                    streamSource.close();
+                }
+            };
+
+            streamSource.onerror = () => {
+                const out = document.getElementById("streamOutput");
+                out.textContent += "\n[Connection closed]\n";
+                streamSource.close();
+            };
+        }
+
+        window.onload = function() {
+            localStorage.removeItem('stream_postfix');
+        }
+        function showManualMode() {
+            document.getElementById('scanMode').style.display = 'none';
+            document.getElementById('manualMode').style.display = 'block';
+            document.getElementById('wifiStatusMessage').style.display = 'none';
+        }
+        function showScanMode() {
+            document.getElementById('scanMode').style.display = 'block';
+            document.getElementById('manualMode').style.display = 'none';
+        }
+        function scanWifi() {
+            const list = document.getElementById('wifiList');
+            const btn = document.getElementById('scanBtn');
+            const statusMsg = document.getElementById('wifiStatusMessage');
+            showScanMode();
+            list.style.display = 'block';
+            list.innerHTML = '<div style="padding:10px;">Suche nach Netzwerken...</div>';
+            statusMsg.style.display = 'none';
+            btn.disabled = true;
+            fetch('/api/scan')
+                .then(res => {
+                    if (!res.ok) {
+                        throw new Error('Scan API failed');
+                    }
+                    return res.json();
+                })
+                .then(data => {
+                    list.innerHTML = '';
+                    btn.disabled = false;
+                    if(data.networks.length === 0) {
+                        list.innerHTML = '<div style="padding:10px;">No network found.</div>';
+                        return;
+                    }
+                    data.networks.forEach(ssid => {
+                        const div = document.createElement('div');
+                        div.className = 'wifi-item';
+                        div.innerText = ssid;
+                        div.onclick = () => selectWifi(ssid);
+                        list.appendChild(div);
+                    });
+                })
+                .catch(err => {
+                    console.error("Scan Error:", err);
+                    statusMsg.className = 'error-message';
+                    statusMsg.innerHTML = 'Scan failed. Camera in Access Point Mode?';
+                    statusMsg.style.display = 'block';
+                    list.style.display = 'none';
+                    btn.disabled = false;
+                    showManualMode();
+                });
+        }
+        function selectWifi(ssid) {
+            document.getElementById('ssidInput').value = ssid;
+            document.getElementById('connectForm').style.display = 'block';
+            document.getElementById('pwInput').focus();
+        }
+        function connectWifi() {
+            const ssid = document.getElementById('ssidInput').value;
+            const pw = document.getElementById('pwInput').value;
+            sendWifiConfig(ssid, pw, 'Available Networks');
+        }
+        function configureManualWifi() {
+            const ssid = document.getElementById('manualSsidInput').value.trim();
+            const pw = document.getElementById('manualPwInput').value.trim();
+            if (!ssid || !pw) {
+                showMessage('SSID and password must not be empty!', true);
+                return;
+            }
+            sendWifiConfig(ssid, pw, 'Manual input');
+        }
+        function sendWifiConfig(ssid, pw, mode) {
+            showConfirmation(`WIFI "${ssid}" (${mode}) save and restart?`, (confirmed) => {
+                if (!confirmed) return;
+
+                fetch('/api/wifi', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ssid: ssid, password: pw})
+                })
+                .then(res => {
+                    if (res.ok) {
+                        showMessage(`New data saved for "${ssid}". System restart`, false);
+                    } else {
+                        return res.json().then(data => { throw new Error(data.message || 'Unknown error'); });
+                    }
+                })
+                .catch(err => {
+                    console.error("WiFi Config Error:", err);
+                    showMessage(`Error while saving config: ${err.message || 'Networkerror.'}`, true);
+                });
+            });
+        }
+    </script>
+</body>
+</html>
