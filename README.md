@@ -7,7 +7,7 @@ This Project ist based on [Buildroot](https://buildroot.org/) and [MediaMTX](htt
 
 # Installation
 ## Raspberry Pi OS:
-If you want to use the offical Raspberry Pi OS please follow [README-rpi-OS](README-rpi-OS)
+If you want to use the offical Raspberry Pi OS please follow [README-rpi-OS](README-rpi-OS.md)
 
 
 ## BabyCamOS:
