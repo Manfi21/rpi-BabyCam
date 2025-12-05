@@ -247,11 +247,11 @@ def connect_wifi():
             print(run_command("/etc/init.d/S41wifi_ap_fallback stop"))
             print(run_command("/etc/init.d/S40iwd stop"))
             time.sleep(2)
+            print(run_command("ifconfig wlan0 down"))
             print(run_command("ip addr flush dev wlan0"))
             print(run_command("/etc/init.d/S40iwd start"))
             print(run_command("/etc/init.d/S40network restart", timeout=20))
             print(run_command("ip neigh flush all"))
-            print(run_command("ifconfig wlan0 down"))
             print(run_command("ifconfig wlan0 up"))
             print("New Network set.")
 
@@ -282,7 +282,7 @@ def system_stream():
     action = request.args.get('action', '')  # GET-Parameter statt JSON
     commands = {
         "update_mediamtx": "/root/mediamtx --upgrade",
-        "update_webserver": "echo 'update curl from github?'",
+        "update_webserver": "/root/update_webserver.sh",
         "setup_tailscale": "tailscale up",
         "restart_cameraserver": "/etc/init.d/S99start_mediamtx restart",
         "restart_webserver": "/etc/init.d/S99webadmin restart"

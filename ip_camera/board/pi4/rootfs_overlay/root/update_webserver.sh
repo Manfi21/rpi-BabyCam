@@ -1,7 +1,7 @@
 #!/bin/sh
 # update_webserver.sh
 
-REPO_USER="ManuFi21"
+REPO_USER="Manfi21"
 REPO_NAME="rpi-BabyCam"
 BRANCH="main"
 REMOTE_FOLDER="ip_camera/board/pi4/rootfs_overlay/opt/webadmin"

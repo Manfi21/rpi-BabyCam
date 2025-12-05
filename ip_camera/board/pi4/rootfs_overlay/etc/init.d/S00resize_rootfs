@@ -12,4 +12,3 @@ resize2fs /dev/mmcblk0p2
 # Just for the first time boot
 touch "$FIRSTBOOT"
 echo "Root filesystem resized."
-reboot
