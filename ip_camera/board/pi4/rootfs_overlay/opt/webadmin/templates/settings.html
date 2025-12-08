@@ -203,6 +203,19 @@
                 <button class="btn-blue" style="flex: 1;" onclick="sys_stream('restart_cameraserver')">Restart Camera Server</button>
                 <button class="btn-blue" style="flex: 1;" onclick="sys_stream('restart_webserver')">Restart Webserver</button>
             </div>
+            <div style="margin-top: 20px;">
+                <h3>🔐 Web Basic Auth</h3>
+                <label for="authUserInput">Username:</label>
+                <input type="text" id="authUserInput" placeholder="Username">
+
+                <label for="authPassInput">Password:</label>
+                <input type="password" id="authPassInput" placeholder="Password">
+
+                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                    <button class="btn-green" style="flex: 1;" onclick="saveAuthUser()">Save</button>
+                    <button class="btn-red" style="flex: 1;" onclick="disableAuthUser()">Disable password</button>
+                </div>
+            </div>
         </div>
     </div>
     <!-- Custom Modal HTML -->
@@ -499,6 +512,59 @@
                     console.error("WiFi Config Error:", err);
                     showMessage(`Error while saving config: ${err.message || 'Networkerror.'}`, true);
                 });
+            });
+        }
+        async function saveAuthUser() {
+            const user = document.getElementById('authUserInput').value.trim();
+            const pass = document.getElementById('authPassInput').value.trim();
+
+            if (!user) {
+                showMessage('Username is required', true);
+                return;
+            }
+
+            showConfirmation(`Save credentials for "${user}"?`, async (confirmed) => {
+                if (!confirmed) return;
+
+                try {
+                    const res = await fetch('/api/auth_user', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({user: user, password: pass})
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                        showMessage(data.message || 'Credentials saved');
+                    } else {
+                        showMessage(data.error || 'Failed to save credentials', true);
+                    }
+                } catch (e) {
+                    showMessage('Network error: ' + e.message, true);
+                }
+            });
+        }
+
+        async function disableAuthUser() {
+            showConfirmation('Disable password and allow any user?', async (confirmed) => {
+                if (!confirmed) return;
+
+                try {
+                    const res = await fetch('/api/auth_user', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({user: 'any', password: ''})
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                        document.getElementById('authUserInput').value = '';
+                        document.getElementById('authPassInput').value = '';
+                        showMessage(data.message || 'Password disabled, any user allowed');
+                    } else {
+                        showMessage(data.error || 'Failed to disable password', true);
+                    }
+                } catch (e) {
+                    showMessage('Network error: ' + e.message, true);
+                }
             });
         }
     </script>

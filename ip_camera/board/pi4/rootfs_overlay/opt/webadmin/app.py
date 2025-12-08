@@ -1,16 +1,20 @@
 import json
 from flask import Flask, render_template, request, jsonify, redirect, url_for, Response
+from functools import wraps
 import subprocess
 import os
 import requests
 import json
 import time
+import hashlib
+import base64
 
 app = Flask(__name__)
 
 CONFIG_FILE_PATH = 'stream_postfix.txt'
 MEDIAMTX_API_HOST= "http://127.0.0.1:9997"
 RPI_PREFIX = "rpi"
+USER_FILE = '/root/auth_users.txt'
 
 # -----------------------
 # Helper functions
@@ -27,6 +31,52 @@ def run_command(command, timeout=5):
         return "CMD timeout"
     except Exception as e:
         return str(e)
+
+def hash_credential(cred: str) -> str:
+    h = hashlib.sha256(cred.encode("utf-8")).digest()
+    return base64.b64encode(h).decode("utf-8")
+
+def get_basic_auth_credentials():
+    if not os.path.exists(USER_FILE):
+        return None, None
+    try:
+        line = open(USER_FILE).read().strip()
+        if not line or line.startswith("any:"):
+            return None, None
+        if ":" in line:
+            user, pwd = line.split(":", 1)
+            return user.strip(), pwd.strip()
+        return None, None
+    except Exception:
+        return None, None
+
+def basic_auth_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        hashed_user, hashed_pass = get_basic_auth_credentials()
+        if not hashed_user or not hashed_pass:
+            # Kein Auth erforderlich
+            return f(*args, **kwargs)
+
+        auth = request.authorization
+        if not auth:
+            return Response(
+                "Authentication required", 401,
+                {"WWW-Authenticate": 'Basic realm="Login Required"'}
+            )
+
+        # Hashing der eingegebenen Credentials
+        input_user_hash = hash_credential(auth.username)
+        input_pass_hash = hash_credential(auth.password)
+
+        if input_user_hash != hashed_user or input_pass_hash != hashed_pass:
+            return Response(
+                "Authentication required", 401,
+                {"WWW-Authenticate": 'Basic realm="Login Required"'}
+            )
+
+        return f(*args, **kwargs)
+    return decorated
 
 def get_current_ssid():
     try:
@@ -153,6 +203,7 @@ def format_dict_for_html(data):
 app.jinja_env.globals.update(format_dict_for_html=format_dict_for_html)
 
 @app.route('/api/mediamtx/cam', methods=['PATCH'])
+@basic_auth_required
 def patch_mediamtx_cam_path_config():
     """Proxies the PATCH request to MediaMTX's 'cam' path config set endpoint."""
     try:
@@ -286,6 +337,7 @@ def system_control():
     return jsonify({'status': 'Unknown command'}), 400
 
 @app.route('/api/system/stream', methods=['GET'])
+@basic_auth_required
 def system_stream():
     action = request.args.get('action', '')  # GET-Parameter statt JSON
     commands = {
@@ -319,6 +371,26 @@ def system_stream():
             yield f"data: ERROR: {str(e)}\n\n"
 
     return Response(generate(), mimetype='text/event-stream')
+
+@app.route('/api/auth_user', methods=['POST'])
+@basic_auth_required
+def api_auth_user():
+    data = request.json or {}
+    user = data.get('user', '').strip()
+    password = data.get('password', '').strip()
+
+    if not user:
+        return jsonify({'error': 'Username required'}), 400
+
+    try:
+        cmd = ["/opt/webadmin/update_mediamtx_auth.sh", user, password]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode == 0:
+            return jsonify({'message': 'Credentials updated successfully'})
+        else:
+            return jsonify({'error': result.stderr or 'Script failed'}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 # -----------------------
 # HTML-Sites
