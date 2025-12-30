@@ -80,13 +80,18 @@ def basic_auth_required(f):
 
 def get_current_ssid():
     try:
-        raw = run_command("iwctl station wlan0 show | grep 'Connected network' || true")
-        if raw and "Connected network" in raw:
-            parts = raw.split("Connected network")
-            if len(parts) >= 2:
-                return parts[-1].strip(" :\n\t")
-    except Exception:
-        pass
+        # Get the current status from wpa_supplicant
+        raw = run_command("wpa_cli -i wlan0 status")
+
+        if raw:
+            # Look for the line starting with 'ssid='
+            for line in raw.splitlines():
+                if line.startswith("ssid="):
+                    return line.split("=", 1)[1].strip()
+
+    except Exception as e:
+        print(f"[ERROR] Could not get current SSID: {str(e)}")
+
     return "Not connected"
 
 def get_ip_address():
@@ -233,51 +238,29 @@ def patch_mediamtx_cam_path_config():
 # -----------------------
 @app.route('/api/scan', methods=['GET'])
 def scan_wifi():
-    scan_result = run_command("iwctl station wlan0 scan")
+    scan_trigger = run_command("wpa_cli -i wlan0 scan")
 
-    if "failed" in scan_result.lower() or "not available" in scan_result.lower():
-        return jsonify({'status': 'error', 'message': 'Scan failed. No Wifi or in AP mode.'}), 500
+    if "OK" not in scan_trigger:
+        return jsonify({
+            'status': 'error',
+            'message': 'Scan failed. Interface might be busy or in AP mode.'
+        }), 500
 
-    command = (
-        "iwctl station wlan0 get-networks 2>/dev/null "
-        "| sed 's/\x1b\[[0-9;]*m//g' "
-        "| awk 'NR>3 && !($0 ~ /----/) {print $0}' || true"
-    )
+    time.sleep(1)
 
-    raw_output_networks = run_command(command)
+    raw_results = run_command("wpa_cli -i wlan0 scan_results")
 
     networks = []
-    lines = raw_output_networks.splitlines()
+    lines = raw_results.splitlines()
 
-    security_keywords = ['psk', 'open', '8021x', 'unsecured']
-
-    for line in lines:
-        if not line.strip():
-            continue
-
-        potential_ssid = line.strip()
-        min_index = len(line)
-        found_token = None
-
-        for token in security_keywords:
-            index = line.lower().find(token)
-            if index != -1 and index < min_index:
-                min_index = index
-                found_token = token
-
-        if found_token:
-            potential_ssid = line[:min_index].strip()
-        else:
-            potential_ssid = line[:40].strip()
-
-        if potential_ssid.startswith('>'):
-            potential_ssid = potential_ssid[1:].strip()
-
-        if potential_ssid.lower() in ['network', 'name', 'security', 'signal', 'psk', 'open', 'unsecured', '8021x']:
-            continue
-
-        if potential_ssid and potential_ssid not in networks:
-            networks.append(potential_ssid)
+    # Skip the first two lines (header and separator)
+    for line in lines[2:]:
+        parts = line.split('\t')
+        if len(parts) >= 5:
+            ssid = parts[4].strip()
+            # Avoid empty SSIDs (hidden networks) and duplicates
+            if ssid and ssid not in networks:
+                networks.append(ssid)
 
     return jsonify({'networks': networks})
 
@@ -288,36 +271,20 @@ def connect_wifi():
     password = data.get('password', '')
 
     if not ssid:
-        return jsonify({'status': 'error', 'message': 'SSID fehlt'}), 400
-
-    filename = f"/var/lib/iwd/{ssid}.psk"
+        return jsonify({'status': 'error', 'message': 'SSID missing'}), 400
 
     try:
-        if not os.path.exists("/var/lib/iwd"):
-             os.makedirs("/var/lib/iwd", exist_ok=True)
+        print(f"[WIFI] Started add_wifi.sh for SSID: {ssid}")
+        print(run_command(f"/root/add_wifi.sh {ssid} {password}", timeout=30))
+
+        return jsonify({
+            'status': 'success',
+            'message': f'Connection attempt to {ssid} started. If it fails, the hotspot will return in 30 seconds.'
+        })
+
     except Exception as e:
-        return jsonify({'status': 'error', 'message': f'Error creating iwd-path: {str(e)}'}), 500
-
-    try:
-        if password:
-            with open(filename, "w") as f:
-                f.write(f"[Security]\nPassphrase={password}\n")
-
-            print(run_command("/etc/init.d/S41wifi_ap_fallback stop"))
-            print(run_command("/etc/init.d/S40iwd stop"))
-            time.sleep(2)
-            print(run_command("ifconfig wlan0 down"))
-            print(run_command("ip addr flush dev wlan0"))
-            print(run_command("/etc/init.d/S40iwd start"))
-            print(run_command("/etc/init.d/S40network restart", timeout=20))
-            print(run_command("ip neigh flush all"))
-            print(run_command("ifconfig wlan0 up"))
-            print("New Network set.")
-
-        return jsonify({'status': 'success', 'message': f'Connecting to {ssid}.'})
-    except Exception as e:
+        print(f"[ERROR] Failed to start wifi script: {str(e)}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
-
 
 @app.route('/api/system', methods=['POST'])
 def system_control():
@@ -371,6 +338,42 @@ def system_stream():
             yield f"data: ERROR: {str(e)}\n\n"
 
     return Response(generate(), mimetype='text/event-stream')
+
+@app.route('/api/version', methods=['GET'])
+def get_version():
+    version_file = '/etc/babycam-version'
+    data = {
+        'version': 'unknown',
+        'full_build': 'unknown',
+        'build_date': 'unknown'
+    }
+
+    if not os.path.exists(version_file):
+        return jsonify({
+            'status': 'error',
+            'message': 'Version information not found on system'
+        }), 404
+
+    try:
+        with open(version_file, 'r') as f:
+            for line in f:
+                # Split 'KEY=VALUE' into key and value
+                if '=' in line:
+                    key, value = line.strip().split('=', 1)
+                    if key == 'VERSION':
+                        data['version'] = value
+                    elif key == 'FULL_BUILD':
+                        data['full_build'] = value
+                    elif key == 'BUILD_DATE':
+                        data['build_date'] = value
+
+        return jsonify(data)
+
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Failed to read version file: {str(e)}'
+        }), 500
 
 @app.route('/api/auth_user', methods=['POST'])
 @basic_auth_required

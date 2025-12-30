@@ -7,7 +7,6 @@ export PYTHONUNBUFFERED=1
 
 start() {
     echo -n "Starting $NAME: "
-    # Startet Python Flask im Hintergrund
     cd $DIR
     start-stop-daemon -S -b -m -p /var/run/$NAME.pid -O "$LOGFILE" --exec /usr/bin/python3 -- $DIR/app.py
     echo "OK"

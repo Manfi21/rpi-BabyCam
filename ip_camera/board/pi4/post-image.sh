@@ -3,15 +3,9 @@
 set -e
 
 BOARD_DIR="$(dirname $0)"
-echo ${BOARD_DIR}
 BOARD_NAME="$(basename ${BOARD_DIR})"
 GENIMAGE_CFG="${BOARD_DIR}/genimage-${BOARD_NAME}.cfg"
 GENIMAGE_TMP="${BUILD_DIR}/genimage.tmp"
-
-mkdir -p ${TARGET_DIR}/boot
-if [ -f "${TARGET_DIR}/etc/init.d/S80dnsmasq" ]; then \
-    rm -f "${TARGET_DIR}/etc/init.d/S80dnsmasq"; \
-fi
 
 if [ ! -e "${GENIMAGE_CFG}" ]; then
 	GENIMAGE_CFG="${BINARIES_DIR}/genimage.cfg"

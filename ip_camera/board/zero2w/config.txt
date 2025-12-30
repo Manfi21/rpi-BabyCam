@@ -1,5 +1,5 @@
-start_file=start4.elf
-fixup_file=fixup4.dat
+start_file=start.elf
+fixup_file=fixup.dat
 
 kernel=Image
 
@@ -7,6 +7,9 @@ disable_overscan=1
 
 # dtoverlay=imx708
 camera_auto_detect=1
+gpu_mem_256=100
+#gpu_mem_512=100
+#gpu_mem_1024=100
 
 # Enable UART0 for serial console on ttyAMA0
 dtoverlay=miniuart-bt

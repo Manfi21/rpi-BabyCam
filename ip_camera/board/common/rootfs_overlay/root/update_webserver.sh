@@ -4,7 +4,7 @@
 REPO_USER="Manfi21"
 REPO_NAME="rpi-BabyCam"
 BRANCH="main"
-REMOTE_FOLDER="ip_camera/board/pi4/rootfs_overlay/opt/webadmin"
+REMOTE_FOLDER="ip_camera/board/common/rootfs_overlay/opt/webadmin"
 LOCAL_FOLDER="/opt/webadmin"
 BACKUP_FOLDER="/opt/webadmin_backup"
 TMP_TAR="/tmp/webadmin_update.tar.gz"

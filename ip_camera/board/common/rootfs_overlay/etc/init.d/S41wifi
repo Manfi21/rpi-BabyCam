@@ -1,0 +1,79 @@
+#!/bin/sh
+
+WLAN_IF="wlan0"
+AP_IP="192.168.4.1"
+AP_SSID="PI_BabyCam"
+WP_CONF="/etc/wpa_supplicant.conf"
+WP_RUN="/var/run/wpa_supplicant"
+
+check_wifi_connected() {
+    wpa_cli -p $WP_RUN -i $WLAN_IF status 2>/dev/null | grep -q "wpa_state=COMPLETED"
+}
+
+stop_ap() {
+    echo "[AP] Stopping hotspot, dnsmasq and station mode..."
+    killall hostapd dnsmasq wpa_supplicant 2>/dev/null
+    sleep 1
+    ip addr flush dev $WLAN_IF
+}
+
+start_sta() {
+    echo "[STA] Starting Station Mode (Connecting to Router)..."
+    mkdir -p $WP_RUN
+    wpa_supplicant -B -i $WLAN_IF -c $WP_CONF
+
+    for i in $(seq 1 15); do
+        if check_wifi_connected; then
+            echo "[STA] Connected! Requesting IP..."
+            udhcpc -i $WLAN_IF -n -t 5
+            return 0
+        fi
+        sleep 1
+    done
+    return 1
+}
+
+start_ap() {
+    echo "[AP] Starting hotspot..."
+
+    # Interface für AP vorbereiten
+    ip link set $WLAN_IF down
+    ip addr flush dev $WLAN_IF
+    ip addr add $AP_IP/24 dev $WLAN_IF
+    ip link set $WLAN_IF up
+
+    sleep 1
+
+    # Hostapd starten
+    hostapd /etc/hostapd.conf -B
+
+    # Start dnsmasq
+    dnsmasq -C /etc/dnsmasq.conf
+
+    echo "[AP] Hotspot started: $AP_SSID"
+}
+
+case "$1" in
+    start)
+        stop_ap
+
+        if start_sta; then
+            echo "[WIFI] Success: Internet/Router connection active."
+        else
+            echo "[WIFI] Failed to connect to Router. Falling back to AP."
+            start_ap
+        fi
+        ;;
+    stop)
+        stop_ap
+        ;;
+    restart)
+        $0 stop
+        sleep 2
+        $0 start
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart}"
+        exit 1
+esac
+exit 0

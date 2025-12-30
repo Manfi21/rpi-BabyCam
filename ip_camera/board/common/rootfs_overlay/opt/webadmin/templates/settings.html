@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <a href="/" class="back-link">← Back to Stream</a>
+    {% if message %}
+        <div class="message">{{ message }}</div>
+    {% endif %}
+    <div class="card">
+        <h2>ℹ️ Status</h2>
+        <div class="info-row"><span>WIFI (SSID):</span> <strong>{{ ssid }}</strong></div>
+        <div class="info-row"><span>IP Adress:</span> <strong>{{ ip }}</strong></div>
+        <div class="info-row"><span>Tailscale IP Adress:</span> <strong>{{ ip_tailscale }}</strong></div>
+    </div>
+    <div class="card">
+        <h2>📶 Wifi Settings</h2>
+        <div id="wifiStatusMessage" style="padding: 10px; margin-bottom: 15px; display: none;"></div>
+        <div id="scanMode">
+            <button class="btn-blue" onclick="scanWifi()" id="scanBtn">🔍 Network scan</button>
+            <div id="wifiList" class="wifi-list" style="display:none;"></div>
+            <div id="connectForm" style="display:none; margin-top: 15px; border-top: 1px solid #555; padding-top: 10px;">
+                <label>Connect to network:</label>
+                <input type="text" id="ssidInput" readonly>
+                <label>Password:</label>
+                <input type="password" id="pwInput" placeholder="Wifi PSK">
+                <button class="btn-green" onclick="connectWifi()">Connect</button>
+            </div>
+        </div>
+        <div id="manualMode" style="display: none;">
+            <p style="font-size: 0.9em; color: #aaa;">
+                ⚠️ **Scan failed.** Please type in SSID and password.
+            </p>
+
+            <label for="manualSsidInput">WIFI SSID:</label>
+            <input type="text" id="manualSsidInput" placeholder="SSID" required>
+
+            <label for="manualPwInput">Password:</label>
+            <input type="password" id="manualPwInput" placeholder="WIFI PSK" required>
+
+            <button class="btn-green" onclick="configureManualWifi()">
+                Save Network & restart
+            </button>
+        </div>
+    </div>
+    <div class="card">
+        <h2>🎬 Stream Postfix</h2>
+        <form action="/settings" method="POST" onsubmit="savePostfixToLocal()">
+            <label for="streamPostfixInput">Postfix:</label>
+            <input type="text" name="stream_postfix" id="streamPostfixInput" value="{{ stream_postfix }}">
+            <button class="btn-blue" type="submit">Save</button>
+        </form>
+    </div>
+    <!-- Card for MediaMTX config -->
+    <div class="card">
+        <h2 class="toggle-header" onclick="toggleConfig('mediamtxConfig', 'mediamtxToggle')">
+            <span>⚙️ MediaMTX configuration</span>
+            <span id="mediamtxToggle" class="toggle-icon collapsed">▼</span>
+        </h2>
+        <div id="mediamtxConfig" style="display:none;">
+            <div class="toggle-header" onclick="toggleConfig('pathCamConfigWrapper', 'pathCamToggle')" style="margin-bottom: 5px;">
+                <h3 style="margin: 0;">'cam' path settings</h3>
+                <span id="pathCamToggle" class="toggle-icon collapsed">▼</span>
+            </div>
+            <div id="pathCamConfigWrapper" style="display:none; padding-left: 5px; border-left: 2px solid #555;">
+                {% if mediamtx_config.path_cam.error %}
+                    <div class="error-message">{{ mediamtx_config.path_cam.error }}</div>
+                {% else %}
+                    <div id="pathCamDisplay">
+                        <div style="margin-bottom: 10px;">
+                            <button class="btn-blue" onclick="toggleEdit('pathCam')">Change config</button>
+                        </div>
+                        {{ format_dict_for_html(mediamtx_config.path_cam) | safe }}
+                    </div>
+                    <div id="pathCamEdit" style="display:none;">
+                        <label for="pathCamConfigRaw">Config:</label>
+                        <textarea id="pathCamConfigRaw" rows="10" class="config-editor"></textarea>
+                        <div style="display: flex; gap: 10px;">
+                            <button class="btn-green" style="flex-grow: 1;" onclick="saveConfig('pathCam')">Save (PATCH)</button>
+                            <button class="btn-red" style="flex-grow: 1;" onclick="toggleEdit('pathCam')">Cancel</button>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="card">
+        <h2>⚡ System</h2>
+        <div style="display: flex; gap: 10px;">
+            <button class="btn-red" style="flex: 1;" onclick="sys('reboot')">Reboot</button>
+            <button class="btn-red" style="flex: 1;" onclick="sys('poweroff')">Shutdown</button>
+        </div>
+        <h3 class="toggle-header" onclick="toggleConfig('settingsWrapper', 'settingsToggle')">
+            <span>Advanced settings</span>
+            <span id="settingsToggle" class="toggle-icon collapsed">▼</span>
+        </h3>
+        <div id="settingsWrapper" style="display:none;">
+            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                <button class="btn-blue" style="flex: 1;" onclick="sys_stream('update_mediamtx')">Update Camera Server</button>
+                <button class="btn-blue" style="flex: 1;" onclick="sys_stream('update_webserver')">Update Webserver</button>
+            </div>
+            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                <button class="btn-blue" style="flex: 1;" onclick="sys_stream('setup_tailscale')">Setup Tailscale</button>
+                <button class="btn-blue" style="flex: 1;" onclick="sys_stream('restart_cameraserver')">Restart Camera Server</button>
+                <button class="btn-blue" style="flex: 1;" onclick="sys_stream('restart_webserver')">Restart Webserver</button>
+            </div>
+            <div style="margin-top: 20px;">
+                <h3>🔐 Web Basic Auth</h3>
+                <label for="authUserInput">Username:</label>
+                <input type="text" id="authUserInput" placeholder="Username">
+
+                <label for="authPassInput">Password:</label>
+                <input type="password" id="authPassInput" placeholder="Password">
+
+                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                    <button class="btn-green" style="flex: 1;" onclick="saveAuthUser()">Save</button>
+                    <button class="btn-red" style="flex: 1;" onclick="disableAuthUser()">Disable password</button>
+                </div>
+            </div>
+        </div>
+        <div style="margin-top: 25px; border-top: 1px solid #eee; padding-top: 15px;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="16" x2="12" y2="12"></line>
+                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                </svg>
+                <h3 style="margin: 0; font-size: 1.1em;">Version Info</h3>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 6px; font-size: 0.9em;">
+                <div style="display: flex; gap: 5px;">
+                    <span>Version:</span>
+                    <span id="version_os" style="font-weight: bold;">-</span>
+                </div>
+                <div style="display: flex; gap: 5px;">
+                    <span>Full Build:</span>
+                    <span id="version_os_full" style="font-family: monospace;">-</span>
+                </div>
+                <div style="display: flex; gap: 5px;">
+                    <span>Build Date:</span>
+                    <span id="build_date" style="font-family: monospace;">-</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Custom Modal HTML -->
+    <div id="customModal" class="modal-overlay">
+        <div class="modal-content">
+            <p id="modalMessage"></p>
+            <div class="modal-buttons">
+                <button id="modalConfirmBtn" class="btn-green" style="display:none;">Yes</button>
+                <button id="modalCancelBtn" class="btn-red" style="display:none;">Cancel</button>
+                <button id="modalOkBtn" class="btn-blue">OK</button>
+            </div>
+        </div>
+    </div>
+    <div id="streamModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 600px;">
+            <h3>Live Output</h3>
+            <pre id="streamOutput" style="
+                background:#111;
+                padding:10px;
+                height:300px;
+                overflow-y:auto;
+                color:#0f0;
+                border:1px solid #444;
+            "></pre>
+            <button class="btn-blue" onclick="closeStream()">Close</button>
+        </div>
+    </div>
+    <script id="pathCamRawJson" type="application/json">
+        {{ mediamtx_config.path_cam | tojson | safe }}
+    </script>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
