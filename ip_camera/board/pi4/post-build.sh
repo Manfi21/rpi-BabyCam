@@ -17,7 +17,7 @@ MAIN_REPO_DIR=$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null)
 
 if [ -n "$MAIN_REPO_DIR" ]; then
     CLEAN_TAG=$(git -C "$MAIN_REPO_DIR" describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-    FULL_VERSION=$(git -C "$MAIN_REPO_DIR" describe --tags --always --dirty 2>/dev/null || echo "v0.0.0-unknown")
+    FULL_VERSION=$(git -C "$MAIN_REPO_DIR" describe --tags --always --long --dirty 2>/dev/null || echo "v0.0.0-unknown")
 else
     CLEAN_TAG="v0.0.0-error"
     FULL_VERSION="v0.0.0-repo-not-found"

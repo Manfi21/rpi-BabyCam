@@ -77,6 +77,10 @@ if [ $SUCCESS -eq 1 ]; then
     # Obtain an IP address
     echo "[WIFI] Requesting IP address via DHCP..."
     udhcpc -i $WLAN_IF -n -t 5
+    sleep 1
+
+    echo "[WIFI] Restarting MediaMTX camera server..."
+    /etc/init.d/S99start_mediamtx restart
     exit 0
 else
     echo "[FAILURE] Connection timed out. Removing temporary credentials."

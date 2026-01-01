@@ -55,7 +55,7 @@ def basic_auth_required(f):
     def decorated(*args, **kwargs):
         hashed_user, hashed_pass = get_basic_auth_credentials()
         if not hashed_user or not hashed_pass:
-            # Kein Auth erforderlich
+            # No auth needed
             return f(*args, **kwargs)
 
         auth = request.authorization
@@ -65,7 +65,7 @@ def basic_auth_required(f):
                 {"WWW-Authenticate": 'Basic realm="Login Required"'}
             )
 
-        # Hashing der eingegebenen Credentials
+        # Hashing of credentials
         input_user_hash = hash_credential(auth.username)
         input_pass_hash = hash_credential(auth.password)
 
@@ -234,7 +234,7 @@ def patch_mediamtx_cam_path_config():
         return jsonify({"status": "error", "error": str(e)}), 500
 
 # -----------------------
-# API-Endpunkte (WLAN, System)
+# API-Endpoint (WLAN, System)
 # -----------------------
 @app.route('/api/scan', methods=['GET'])
 def scan_wifi():
@@ -275,7 +275,7 @@ def connect_wifi():
 
     try:
         print(f"[WIFI] Started add_wifi.sh for SSID: {ssid}")
-        print(run_command(f"/root/add_wifi.sh {ssid} {password}", timeout=30))
+        os.system(f"/opt/webadmin/add_wifi.sh {ssid} {password} &")
 
         return jsonify({
             'status': 'success',
@@ -292,15 +292,18 @@ def system_control():
     if action == 'reboot':
         try:
             os.system("/sbin/reboot &")
-        except:
-            pass
-        return jsonify({'status': 'Rebooting...'})
+            return jsonify({'status': 'Rebooting...'})
+        except Exception as e:
+            print(f"[ERROR] Failed to reboot system: {str(e)}")
+            return jsonify({'status': 'error', 'message': str(e)}), 500
+
     elif action == 'poweroff':
         try:
             os.system("/sbin/poweroff &")
-        except:
-            pass
-        return jsonify({'status': 'Shutting down...'})
+            return jsonify({'status': 'Shutting down...'})
+        except Exception as e:
+            print(f"[ERROR] Failed to sshuttdown system: {str(e)}")
+            return jsonify({'status': 'error', 'message': str(e)}), 500
     return jsonify({'status': 'Unknown command'}), 400
 
 @app.route('/api/system/stream', methods=['GET'])
@@ -331,7 +334,7 @@ def system_stream():
             )
             for line in process.stdout:
                 yield f"data: {line.rstrip()}\n\n"
-                # print(f"data: {line.rstrip()}\n\n")
+                print(f"data: {line.rstrip()}\n\n")
             process.wait()
             yield "data: --- DONE ---\n\n"
         except Exception as e:
