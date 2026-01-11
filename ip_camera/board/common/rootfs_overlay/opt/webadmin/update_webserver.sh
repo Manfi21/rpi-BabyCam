@@ -14,9 +14,11 @@ VERSION_FILE="/etc/babycam-version"
 # -----------------------------
 # 1. Backup
 # -----------------------------
+tailscale down
 echo "Create backup of webserver $BACKUP_FOLDER ..."
 cp -r "$LOCAL_FOLDER" "$BACKUP_FOLDER" || {
     echo "Backup failed!"
+    tailscale up
     exit 1
 }
 
@@ -24,6 +26,7 @@ echo "Fetching latest version info..."
 LATEST_TAG=$(wget -qO- --header="User-Agent: Mozilla/5.0" "$API_URL" | grep -m 1 '"tag_name":' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')
 if [ -z "$LATEST_TAG" ]; then
     echo "Error: Could not retrieve latest tag."
+    tailscale up
     exit 1
 fi
 
@@ -44,6 +47,7 @@ TAR_URL="https://github.com/$REPO_USER/$REPO_NAME/archive/refs/tags/$LATEST_TAG.
 echo "Downloading $TAR_URL ..."
 wget -qO "$TMP_TAR" "$TAR_URL" || {
     echo "Download failed!"
+    tailscale up
     exit 1
 }
 
@@ -54,6 +58,7 @@ echo "Exctract $REMOTE_FOLDER to $LOCAL_FOLDER ..."
 mkdir -p /tmp/webadmin_update
 tar -xzf "$TMP_TAR" -C /tmp/webadmin_update || {
     echo "Exctract failed!"
+    tailscale up
     exit 1
 }
 
@@ -66,6 +71,7 @@ if [ -d "$FINAL_SRC" ]; then
     echo "Update to $LATEST_TAG finished."
 else
     echo "Directory structure in ZIP changed! Check $REMOTE_FOLDER"
+    tailscale up
     exit 1
 fi
 
@@ -79,12 +85,15 @@ echo "Restart webserver..."
 if [ -x "$INIT_SCRIPT" ]; then
     "$INIT_SCRIPT" restart || {
         echo "Webserver restart failed!"
+        tailscale up
         exit 1
     }
 else
     echo "Init-Skript $INIT_SCRIPT not found!"
+    tailscale up
     exit 1
 fi
 
 echo "Update successfull!"
+tailscale up
 exit 0

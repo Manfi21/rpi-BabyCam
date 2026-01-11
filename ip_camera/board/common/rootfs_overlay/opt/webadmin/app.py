@@ -313,7 +313,7 @@ def system_stream():
     action = request.args.get('action', '')  # GET-Parameter statt JSON
     commands = {
         "update_mediamtx": "/root/mediamtx --upgrade",
-        "update_webserver": "/root/update_webserver.sh",
+        "update_webserver": "/opt/webadmin/update_webserver.sh",
         "setup_tailscale": "tailscale up",
         "restart_cameraserver": "/etc/init.d/S99start_mediamtx restart",
         "restart_webserver": "/etc/init.d/S99webadmin restart"
