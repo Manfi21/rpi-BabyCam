@@ -15,6 +15,7 @@ CONFIG_FILE_PATH = 'stream_postfix.txt'
 MEDIAMTX_API_HOST= "http://127.0.0.1:9997"
 RPI_PREFIX = "rpi"
 USER_FILE = '/root/auth_users.txt'
+MEDIAMTX_CONFIG_PATH = '/root/mediamtx.yml'
 
 # -----------------------
 # Helper functions
@@ -401,6 +402,30 @@ def api_auth_user():
             return jsonify({'error': result.stderr or 'Script failed'}), 500
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/get_config_file')
+@basic_auth_required
+def get_config_file():
+    if not os.path.exists(MEDIAMTX_CONFIG_PATH):
+        return "Datei nicht gefunden", 404
+    with open(MEDIAMTX_CONFIG_PATH, 'r') as f:
+        content = f.read()
+    return content
+
+@app.route('/api/save_config_file', methods=['POST'])
+@basic_auth_required
+def save_config_file():
+    data = request.get_json()
+    content = data.get('content')
+    try:
+        # Sicherheits-Backup erstellen
+        os.system(f'cp {MEDIAMTX_CONFIG_PATH} {MEDIAMTX_CONFIG_PATH}.bak')
+
+        with open(MEDIAMTX_CONFIG_PATH, 'w') as f:
+            f.write(content)
+        return jsonify({"status": "success", "message": "Gespeichert!"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 # -----------------------
 # HTML-Sites

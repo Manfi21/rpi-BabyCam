@@ -343,3 +343,76 @@ async function loadVersionInfo() {
 }
 
 document.addEventListener('DOMContentLoaded', loadVersionInfo);
+
+async function loadFullConfig() {
+    try {
+        const response = await fetch('/api/get_config_file');
+        if (!response.ok) throw new Error('File not found');
+
+        const content = await response.text();
+        const editor = document.getElementById('fullConfigEditor');
+
+        editor.value = content;
+        document.getElementById('editorWrapper').style.display = 'block';
+
+        editor.scrollTop = 0;
+    } catch (e) {
+        showMessage('Error: ' + e.message, true);
+    }
+}
+
+async function openEditor() {
+    try {
+        const response = await fetch('/api/get_config_file');
+        if (!response.ok) throw new Error('Could not load config file.');
+
+        const content = await response.text();
+        const editor = document.getElementById('fullConfigEditor');
+
+        editor.value = content;
+        document.getElementById('editorModal').style.display = 'flex';
+        editor.scrollTop = 0;
+
+        editor.onkeydown = function(e) {
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                const start = this.selectionStart;
+                const end = this.selectionEnd;
+                this.value = this.value.substring(0, start) + "  " + this.value.substring(end);
+                this.selectionStart = this.selectionEnd = start + 2;
+            }
+        };
+    } catch (e) {
+        showMessage('Error: ' + e.message, true);
+    }
+}
+
+function closeEditor() {
+    document.getElementById('editorModal').style.display = 'none';
+}
+
+async function saveFullConfig() {
+    const content = document.getElementById('fullConfigEditor').value;
+    closeEditor();
+
+    showConfirmation("Overwrite mediamtx.yml?", async (confirmed) => {
+        if (!confirmed) return;
+
+        try {
+            const response = await fetch('/api/save_config_file', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({content: content})
+            });
+
+            if (response.ok) {
+                setTimeout(() => sys_stream('restart_cameraserver'), 500);
+            } else {
+                const result = await response.json();
+                showMessage('Error: ' + result.message, true);
+            }
+        } catch (e) {
+            showMessage('Network error while saving.', true);
+        }
+    });
+}
