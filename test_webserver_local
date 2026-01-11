@@ -1,0 +1,1 @@
+sudo venv/bin/python ip_camera/board/common/rootfs_overlay/opt/webadmin/app.py
