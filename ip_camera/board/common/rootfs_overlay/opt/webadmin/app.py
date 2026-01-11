@@ -348,7 +348,8 @@ def get_version():
     data = {
         'version': 'unknown',
         'full_build': 'unknown',
-        'build_date': 'unknown'
+        'build_date': 'unknown',
+        'webserver_version': 'unknown'
     }
 
     if not os.path.exists(version_file):
@@ -365,10 +366,13 @@ def get_version():
                     key, value = line.strip().split('=', 1)
                     if key == 'VERSION':
                         data['version'] = value
+                        data['webserver_version'] = value
                     elif key == 'FULL_BUILD':
                         data['full_build'] = value
                     elif key == 'BUILD_DATE':
                         data['build_date'] = value
+                    elif key == 'WEBSERVER_VERSION':
+                        data['webserver_version'] = value
 
         return jsonify(data)
 
