@@ -1,2 +1,4 @@
 .project_config
 build
+*.img
+*.tar.gz
