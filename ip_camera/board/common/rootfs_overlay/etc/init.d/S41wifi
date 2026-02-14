@@ -27,6 +27,8 @@ start_sta() {
             echo "[STA] Connected! Requesting IP..."
             udhcpc -i $WLAN_IF -n -t 5
             return 0
+        else
+            echo "[STA] connecting... $i"
         fi
         sleep 1
     done
