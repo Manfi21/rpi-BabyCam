@@ -1,42 +1,47 @@
 #!/usr/bin/env bash
 
-GIT_TAG=$(git describe --tags --abbrev=0)
-GIT_TAG=${GIT_TAG:-"no-tag"}
-DATE_STR=$(date +%Y_%m_%d)
+if [ -n "$1" ]; then
+    NEW_TAG="$1"
+    MSG="${2:-"Release $NEW_TAG"}"
 
+    echo "Creating new Git tag: $NEW_TAG"
+    git tag -a "$NEW_TAG" -m "$MSG"
+    GIT_TAG="$NEW_TAG"
+else
+    GIT_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "no-tag")
+fi
+
+DATE_STR=$(date +%Y_%m_%d)
 BASE_NAME="${DATE_STR}_BabyCamOS_${GIT_TAG}"
 
 echo "Starting packaging for Version: $GIT_TAG ($DATE_STR)"
 
-# ---------------------------------------------------------
-# Raspberry Pi Zero 2 W
-# ---------------------------------------------------------
-IMG_ZERO="build/pi0w2_babycam/images/sdcard.img"
-NAME_ZERO="${BASE_NAME}_rpizero2w"
+BOARDS=(
+    "pi0w2_babycam|rpizero2w"
+    "pi3_babycam|rpi3"
+    "pi4_babycam|rpi4"
+)
 
-if [ -f "$IMG_ZERO" ]; then
-    echo "Processing Pi Zero 2 W..."
-    cp "$IMG_ZERO" "${NAME_ZERO}.img"
-    tar -czvf "${NAME_ZERO}.tar.gz" "${NAME_ZERO}.img"
-    rm "${NAME_ZERO}.img"
-else
-    echo "Warning: $IMG_ZERO not found!"
-fi
+for entry in "${BOARDS[@]}"; do
+    IFS="|" read -r BUILD_DIR SUFFIX <<< "$entry"
 
-# ---------------------------------------------------------
-# Raspberry Pi 4
-# ---------------------------------------------------------
-IMG_PI4="build/pi4_babycam/images/sdcard.img"
-NAME_PI4="${BASE_NAME}_rpi4"
+    IMG_PATH="build/${BUILD_DIR}/images/sdcard.img"
+    OUT_NAME="${BASE_NAME}_${SUFFIX}"
 
-if [ -f "$IMG_PI4" ]; then
-    echo "Processing Pi 4..."
-    cp "$IMG_PI4" "${NAME_PI4}.img"
-    tar -czvf "${NAME_PI4}.tar.gz" "${NAME_PI4}.img"
-    rm "${NAME_PI4}.img"
-else
-    echo "Warning: $IMG_PI4 not found!"
-fi
+    if [ -f "$IMG_PATH" ]; then
+        echo "---------------------------------------"
+        echo "Processing $SUFFIX..."
+
+        make "set-project-${BUILD_DIR}"
+        make
+
+        cp "$IMG_PATH" "${OUT_NAME}.img"
+        tar -czvf "${OUT_NAME}.tar.gz" "${OUT_NAME}.img"
+        rm "${OUT_NAME}.img"
+    else
+        echo "Warning: $IMG_PATH not found!"
+    fi
+done
 
 echo "---------------------------------------"
 echo "Done! Files created:"
