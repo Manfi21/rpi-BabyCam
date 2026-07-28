@@ -265,6 +265,36 @@ function sendWifiConfig(ssid, pw, mode) {
         });
     });
 }
+
+async function saveHostname() {
+    const input = document.getElementById('hostnameInput');
+    const hostname = input.value.trim();
+
+    if (!hostname) {
+        showMessage('Hostname must not be empty', true);
+        return;
+    }
+
+    showConfirmation(`Set hostname to "${hostname}"?`, async (confirmed) => {
+        if (!confirmed) return;
+
+        try {
+            const res = await fetch('/api/hostname', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({hostname: hostname})
+            });
+            const data = await res.json();
+            if (res.ok) {
+                showMessage(data.message || 'Hostname updated');
+            } else {
+                showMessage(data.message || 'Failed to update hostname', true);
+            }
+        } catch (e) {
+            showMessage('Network error: ' + e.message, true);
+        }
+    });
+}
 async function saveAuthUser() {
     const user = document.getElementById('authUserInput').value.trim();
     const pass = document.getElementById('authPassInput').value.trim();
@@ -344,23 +374,6 @@ async function loadVersionInfo() {
 
 document.addEventListener('DOMContentLoaded', loadVersionInfo);
 
-async function loadFullConfig() {
-    try {
-        const response = await fetch('/api/get_config_file');
-        if (!response.ok) throw new Error('File not found');
-
-        const content = await response.text();
-        const editor = document.getElementById('fullConfigEditor');
-
-        editor.value = content;
-        document.getElementById('editorWrapper').style.display = 'block';
-
-        editor.scrollTop = 0;
-    } catch (e) {
-        showMessage('Error: ' + e.message, true);
-    }
-}
-
 async function openEditor() {
     try {
         const response = await fetch('/api/get_config_file');
@@ -416,3 +429,178 @@ async function saveFullConfig() {
         }
     });
 }
+
+// -----------------------
+// System Monitor
+// -----------------------
+let statsInterval = null;
+
+function gaugeColor(percent) {
+    if (percent >= 90) return 'var(--bad)';
+    if (percent >= 70) return 'var(--warn)';
+    return 'var(--good)';
+}
+
+function setGauge(prefix, percent, color) {
+    const gauge = document.getElementById(prefix + 'Gauge');
+    const valueEl = document.getElementById(prefix + 'Value');
+    if (!gauge || !valueEl) return;
+    const clamped = Math.max(0, Math.min(100, percent));
+    gauge.style.setProperty('--pct', clamped);
+    gauge.style.setProperty('--color', color);
+    valueEl.textContent = Math.round(percent);
+}
+
+function formatUptime(seconds) {
+    seconds = Math.floor(seconds);
+    const d = Math.floor(seconds / 86400);
+    const h = Math.floor((seconds % 86400) / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const parts = [];
+    if (d) parts.push(d + 'd');
+    if (d || h) parts.push(h + 'h');
+    parts.push(m + 'm');
+    return parts.join(' ');
+}
+
+async function refreshSystemStats() {
+    try {
+        const res = await fetch('/api/system/stats');
+        if (!res.ok) throw new Error('stats request failed');
+        const data = await res.json();
+
+        setGauge('cpu', data.cpu_percent, gaugeColor(data.cpu_percent));
+        setGauge('mem', data.memory.percent, gaugeColor(data.memory.percent));
+        setGauge('disk', data.disk.percent, gaugeColor(data.disk.percent));
+
+        const tempValueEl = document.getElementById('tempValue');
+        if (data.temperature_c !== null && data.temperature_c !== undefined) {
+            const tempPct = Math.min(100, (data.temperature_c / 90) * 100);
+            const tempColor = data.temperature_c >= 75 ? 'var(--bad)' : (data.temperature_c >= 60 ? 'var(--warn)' : 'var(--good)');
+            setGauge('temp', tempPct, tempColor);
+            tempValueEl.textContent = data.temperature_c.toFixed(1);
+        } else {
+            tempValueEl.textContent = '–';
+        }
+
+        document.getElementById('cpuCoreCount').textContent = data.cpu_count + (data.cpu_count === 1 ? ' core' : ' cores');
+        document.getElementById('memDetail').textContent = `${data.memory.used_mb} / ${data.memory.total_mb} MB`;
+        document.getElementById('diskDetail').textContent = `${data.disk.used_gb} / ${data.disk.total_gb} GB`;
+        document.getElementById('loadAverage').textContent = `${data.load_average['1min']} / ${data.load_average['5min']} / ${data.load_average['15min']}`;
+        document.getElementById('uptimeValue').textContent = formatUptime(data.uptime_seconds);
+    } catch (e) {
+        console.error('Error fetching system stats:', e);
+    }
+}
+
+function startSystemStats() {
+    refreshSystemStats();
+    clearInterval(statsInterval);
+    statsInterval = setInterval(refreshSystemStats, 2000);
+}
+
+document.addEventListener('DOMContentLoaded', startSystemStats);
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+        clearInterval(statsInterval);
+    } else {
+        startSystemStats();
+    }
+});
+
+// -----------------------
+// System Logs
+// -----------------------
+let logSource = null;
+let logsPanelOpen = false;
+let currentLogSource = 'webadmin';
+
+function updateLogStatus(state, label) {
+    const dot = document.getElementById('logStatusDot');
+    const labelEl = document.getElementById('logStatusLabel');
+    if (!dot || !labelEl) return;
+    dot.className = 'status-dot status-' + state;
+    labelEl.textContent = label;
+}
+
+function appendLogLine(line) {
+    const out = document.getElementById('logOutput');
+    const atBottom = out.scrollTop + out.clientHeight >= out.scrollHeight - 30;
+
+    const div = document.createElement('div');
+    div.className = 'log-line';
+    div.textContent = line;
+    out.appendChild(div);
+
+    while (out.childElementCount > 500) {
+        out.removeChild(out.firstChild);
+    }
+
+    const autoscroll = document.getElementById('logAutoscroll');
+    if (autoscroll && autoscroll.checked && atBottom) {
+        out.scrollTop = out.scrollHeight;
+    }
+}
+
+function connectLogs(source) {
+    currentLogSource = source;
+    if (logSource) {
+        logSource.close();
+        logSource = null;
+    }
+    document.getElementById('logOutput').textContent = '';
+    updateLogStatus('connecting', 'Connecting…');
+
+    logSource = new EventSource('/api/logs/stream?source=' + encodeURIComponent(source));
+    logSource.onopen = () => updateLogStatus('live', 'Live');
+    logSource.onmessage = (event) => appendLogLine(event.data);
+    logSource.onerror = () => updateLogStatus('error', 'Connection error');
+
+    document.getElementById('logToggleBtn').textContent = 'Pause';
+}
+
+function selectLogSource(source, btn) {
+    document.querySelectorAll('.log-source-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    connectLogs(source);
+}
+
+function toggleLogStream() {
+    const btn = document.getElementById('logToggleBtn');
+    if (logSource) {
+        logSource.close();
+        logSource = null;
+        updateLogStatus('paused', 'Paused');
+        btn.textContent = 'Resume';
+    } else {
+        connectLogs(currentLogSource);
+    }
+}
+
+function clearLogView() {
+    document.getElementById('logOutput').textContent = '';
+}
+
+function toggleLogsPanel() {
+    const content = document.getElementById('logsWrapper');
+    const icon = document.getElementById('logsToggle');
+    logsPanelOpen = !logsPanelOpen;
+
+    if (logsPanelOpen) {
+        content.style.display = 'block';
+        icon.classList.add('expanded');
+        connectLogs(currentLogSource);
+    } else {
+        content.style.display = 'none';
+        icon.classList.remove('expanded');
+        if (logSource) {
+            logSource.close();
+            logSource = null;
+        }
+        updateLogStatus('disconnected', 'Disconnected');
+    }
+}
+
+window.addEventListener('beforeunload', () => {
+    if (logSource) logSource.close();
+});

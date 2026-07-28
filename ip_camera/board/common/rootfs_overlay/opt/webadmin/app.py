@@ -8,6 +8,9 @@ import json
 import time
 import hashlib
 import base64
+import shutil
+import socket
+import re
 
 app = Flask(__name__)
 
@@ -16,6 +19,15 @@ MEDIAMTX_API_HOST= "http://127.0.0.1:9997"
 RPI_PREFIX = "rpi"
 USER_FILE = '/root/auth_users.txt'
 MEDIAMTX_CONFIG_PATH = '/root/mediamtx.yml'
+THERMAL_ZONE_PATH = '/sys/class/thermal/thermal_zone0/temp'
+HOSTNAME_FILE = '/etc/hostname'
+HOSTNAME_RE = re.compile(r'^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$')
+LOG_SOURCES = {
+    'webadmin': '/var/log/webadmin.log',
+    'mediamtx': '/var/log/mediamtx.log',
+}
+
+_last_cpu_sample = {'total': None, 'idle': None}
 
 # -----------------------
 # Helper functions
@@ -116,6 +128,107 @@ def get_ip_tailscale_address():
         return "Not connected"
     except Exception:
         return "Not connected"
+
+def get_hostname():
+    try:
+        return socket.gethostname()
+    except Exception:
+        return "unknown"
+
+def apply_hostname(new_hostname):
+    with open(HOSTNAME_FILE, 'w') as f:
+        f.write(new_hostname + "\n")
+
+    run_command(f"hostname {new_hostname}")
+
+    # avahi only re-announces its mDNS record on process start, not on
+    # "reload" (that just re-reads static service files) - so it needs a
+    # real stop/start to pick up the new kernel hostname without a reboot.
+    run_command("/etc/init.d/S50avahi-daemon stop")
+    time.sleep(1)
+    run_command("/etc/init.d/S50avahi-daemon start")
+
+# -----------------------
+# System stats (CPU / RAM / Disk / Temp)
+# -----------------------
+def get_cpu_percent():
+    """CPU usage in % since the last call, based on /proc/stat deltas."""
+    global _last_cpu_sample
+    try:
+        with open('/proc/stat') as f:
+            line = f.readline()
+        values = [int(v) for v in line.split()[1:]]
+        idle = values[3] + values[4]  # idle + iowait
+        total = sum(values)
+
+        prev_total = _last_cpu_sample['total']
+        prev_idle = _last_cpu_sample['idle']
+        _last_cpu_sample = {'total': total, 'idle': idle}
+
+        if prev_total is None:
+            return 0.0
+
+        dt = total - prev_total
+        di = idle - prev_idle
+        if dt <= 0:
+            return 0.0
+
+        return round(max(0.0, min(100.0, (1 - di / dt) * 100)), 1)
+    except Exception:
+        return 0.0
+
+def get_memory_info():
+    try:
+        meminfo = {}
+        with open('/proc/meminfo') as f:
+            for line in f:
+                key, _, value = line.partition(':')
+                meminfo[key] = int(value.strip().split()[0])  # kB
+
+        total = meminfo.get('MemTotal', 0)
+        available = meminfo.get('MemAvailable', meminfo.get('MemFree', 0))
+        used = max(0, total - available)
+        percent = round(used / total * 100, 1) if total else 0.0
+
+        return {
+            'total_mb': round(total / 1024, 1),
+            'used_mb': round(used / 1024, 1),
+            'percent': percent
+        }
+    except Exception:
+        return {'total_mb': 0, 'used_mb': 0, 'percent': 0}
+
+def get_disk_info(path='/'):
+    try:
+        usage = shutil.disk_usage(path)
+        percent = round(usage.used / usage.total * 100, 1) if usage.total else 0.0
+        return {
+            'total_gb': round(usage.total / (1024 ** 3), 2),
+            'used_gb': round(usage.used / (1024 ** 3), 2),
+            'percent': percent
+        }
+    except Exception:
+        return {'total_gb': 0, 'used_gb': 0, 'percent': 0}
+
+def get_cpu_temperature():
+    try:
+        with open(THERMAL_ZONE_PATH) as f:
+            return round(int(f.read().strip()) / 1000.0, 1)
+    except Exception:
+        return None
+
+def get_uptime_seconds():
+    try:
+        with open('/proc/uptime') as f:
+            return float(f.read().split()[0])
+    except Exception:
+        return 0.0
+
+def get_load_average():
+    try:
+        return os.getloadavg()
+    except Exception:
+        return (0.0, 0.0, 0.0)
 
 # -----------------------
 # MediaMTX API
@@ -287,6 +400,27 @@ def connect_wifi():
         print(f"[ERROR] Failed to start wifi script: {str(e)}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+@app.route('/api/hostname', methods=['POST'])
+def set_hostname():
+    data = request.json or {}
+    new_hostname = data.get('hostname', '').strip()
+
+    if not new_hostname or not HOSTNAME_RE.match(new_hostname):
+        return jsonify({
+            'status': 'error',
+            'message': 'Invalid hostname. Use only letters, digits and hyphens (max 63 characters, no leading/trailing hyphen).'
+        }), 400
+
+    try:
+        apply_hostname(new_hostname)
+        return jsonify({
+            'status': 'success',
+            'message': f'Hostname set to "{new_hostname}". Reachable as {new_hostname}.local shortly.'
+        })
+    except Exception as e:
+        print(f"[ERROR] Failed to set hostname: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 @app.route('/api/system', methods=['POST'])
 def system_control():
     action = (request.json or {}).get('action', '')
@@ -340,6 +474,51 @@ def system_stream():
             yield "data: --- DONE ---\n\n"
         except Exception as e:
             yield f"data: ERROR: {str(e)}\n\n"
+
+    return Response(generate(), mimetype='text/event-stream')
+
+@app.route('/api/system/stats', methods=['GET'])
+def system_stats():
+    load1, load5, load15 = get_load_average()
+    return jsonify({
+        'cpu_percent': get_cpu_percent(),
+        'cpu_count': os.cpu_count() or 1,
+        'memory': get_memory_info(),
+        'disk': get_disk_info(),
+        'temperature_c': get_cpu_temperature(),
+        'load_average': {
+            '1min': round(load1, 2),
+            '5min': round(load5, 2),
+            '15min': round(load15, 2)
+        },
+        'uptime_seconds': get_uptime_seconds()
+    })
+
+@app.route('/api/logs/stream', methods=['GET'])
+@basic_auth_required
+def logs_stream():
+    source = request.args.get('source', 'webadmin')
+    log_path = LOG_SOURCES.get(source)
+
+    if not log_path:
+        return "event: message\ndata: Unknown log source\n\n", 400
+
+    def generate():
+        if not os.path.exists(log_path):
+            yield f"data: [Log file not found: {log_path}]\n\n"
+            return
+
+        process = subprocess.Popen(
+            ["tail", "-n", "200", "-F", log_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True
+        )
+        try:
+            for line in process.stdout:
+                yield f"data: {line.rstrip()}\n\n"
+        finally:
+            process.kill()
 
     return Response(generate(), mimetype='text/event-stream')
 
@@ -463,6 +642,7 @@ def settings_page():
     ip = get_ip_address()
     ssid = get_current_ssid()
     ip_tailscale = get_ip_tailscale_address()
+    hostname = get_hostname()
     mediamtx_config = {'path_cam': path_cam_filtered}
 
     return render_template(
@@ -470,6 +650,7 @@ def settings_page():
         ip=ip,
         ssid=ssid,
         ip_tailscale=ip_tailscale,
+        hostname=hostname,
         stream_postfix=stream_postfix,
         mediamtx_config=mediamtx_config
     )

@@ -5,47 +5,56 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BabyCam Stream</title>
     <style>
+        * { box-sizing: border-box; }
         body {
             margin: 0;
             background: #000;
             height: 100vh;
             display: flex;
             flex-direction: column;
-/*             overflow: hidden; */
+            font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
         }
         #streamFrame {
-            /* Iframe fill all */
             flex: 1;
             width: 100%;
             border: none;
         }
 
         .controls {
-            /* Button top right corner */
             position: fixed;
-            top: 10px;
-            right: 10px;
+            top: 14px;
+            right: 14px;
             z-index: 100;
             display: flex;
             align-items: center;
-            gap: 5px;
+            gap: 8px;
         }
         .btn {
-            background: rgba(0,0,0,0.5);
-            color: white;
-            border: 1px solid white;
-            padding: 10px 15px;
-            border-radius: 20px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(20, 22, 28, 0.55);
+            backdrop-filter: blur(8px);
+            color: #eee;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            padding: 10px 16px;
+            border-radius: 999px;
             text-decoration: none;
-            font-family: sans-serif;
+            font-size: 0.9rem;
+            font-weight: 500;
             cursor: pointer;
             user-select: none;
+            transition: background 0.15s ease, border-color 0.15s ease;
+        }
+        .btn:hover {
+            background: rgba(40, 44, 56, 0.75);
+            border-color: rgba(255, 255, 255, 0.35);
         }
     </style>
 </head>
 <body>
     <div class="controls">
-        <a href="/settings" class="btn">⚙️ Settings</a>
+        <a href="/settings" class="btn">Settings</a>
     </div>
     <iframe id="streamFrame" allow="autoplay; fullscreen"></iframe>
     <script>
