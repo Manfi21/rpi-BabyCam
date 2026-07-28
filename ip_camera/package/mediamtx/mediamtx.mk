@@ -5,7 +5,7 @@
 #
 ################################################################################
 
-MEDIAMTX_VERSION = 1.15.4
+MEDIAMTX_VERSION = 1.19.3
 MEDIAMTX_SITE = https://github.com/bluenviron/mediamtx/releases/download/v$(MEDIAMTX_VERSION)
 MEDIAMTX_SOURCE = mediamtx_v$(MEDIAMTX_VERSION)_linux_arm64.tar.gz
 MEDIAMTX_LICENSE = MIT
