@@ -446,7 +446,7 @@ def system_control():
 def system_stream():
     action = request.args.get('action', '')  # GET-Parameter statt JSON
     commands = {
-        "update_mediamtx": "/root/mediamtx --upgrade",
+        "update_mediamtx": "/opt/webadmin/update_mediamtx.sh",
         "update_webserver": "/opt/webadmin/update_webserver.sh",
         "setup_tailscale": "tailscale up",
         "restart_cameraserver": "/etc/init.d/S99start_mediamtx restart",
@@ -529,7 +529,8 @@ def get_version():
         'version': 'unknown',
         'full_build': 'unknown',
         'build_date': 'unknown',
-        'webserver_version': 'unknown'
+        'webserver_version': 'unknown',
+        'mediamtx_version': 'unknown'
     }
 
     if not os.path.exists(version_file):
@@ -553,6 +554,8 @@ def get_version():
                         data['build_date'] = value
                     elif key == 'WEBSERVER_VERSION':
                         data['webserver_version'] = value
+                    elif key == 'MEDIAMTX_VERSION':
+                        data['mediamtx_version'] = value
 
         return jsonify(data)
 

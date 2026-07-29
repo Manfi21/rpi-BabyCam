@@ -365,6 +365,7 @@ async function loadVersionInfo() {
             document.getElementById('version_os_full').innerText = data.full_build;
             document.getElementById('build_date').innerText = data.build_date;
             document.getElementById('webserver_version').innerText = data.webserver_version;
+            document.getElementById('mediamtx_version').innerText = data.mediamtx_version;
         }
     } catch (error) {
         console.error('Error fetching version info:', error);

@@ -23,9 +23,13 @@ else
     FULL_VERSION="v0.0.0-repo-not-found"
 fi
 
+MEDIAMTX_VERSION_FILE="${MAIN_REPO_DIR}/ip_camera/package/mediamtx/mediamtx.mk"
+MEDIAMTX_VERSION=`sed -n 's/^MEDIAMTX_VERSION = \(.*\)/\1/p' < $MEDIAMTX_VERSION_FILE`
+
 echo "VERSION=$CLEAN_TAG" > "$VERSION_FILE"
 echo "FULL_BUILD=$FULL_VERSION" >> "$VERSION_FILE"
 echo "BUILD_DATE=$(date +'%Y-%m-%d %H:%M')" >> "$VERSION_FILE"
+echo "MEDIAMTX_VERSION=v$MEDIAMTX_VERSION" >> "$VERSION_FILE"
 
 echo "--------------------------------------------------" > "$ISSUE_FILE"
 echo "  BabyCamOS" >> "$ISSUE_FILE"

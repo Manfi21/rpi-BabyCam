@@ -143,6 +143,23 @@ input[type="text"]:focus, input[type="password"]:focus {
 }
 input[readonly] { color: var(--text-dim); }
 
+select {
+    width: 100%;
+    padding: 11px 12px;
+    margin-top: 6px;
+    box-sizing: border-box;
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: var(--radius-sm);
+    font-size: 0.95rem;
+    transition: border-color 0.15s ease;
+}
+select:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
 button {
     padding: 11px 16px;
     margin-top: 14px;
