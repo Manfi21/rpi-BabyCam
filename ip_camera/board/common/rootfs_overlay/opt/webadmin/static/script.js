@@ -79,6 +79,58 @@ async function saveConfig(configType) {
         showMessage('Networkerror while sending new config. Server is reachable?', true);
     }
 }
+
+async function loadTuningFiles() {
+    const select = document.getElementById('tuningFileSelect');
+    if (!select) return;
+
+    try {
+        const res = await fetch('/api/mediamtx/tuning-files');
+        const data = await res.json();
+
+        (data.files || []).forEach(name => {
+            const opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = name;
+            select.appendChild(opt);
+        });
+
+        const currentFull = select.dataset.current || '';
+        select.value = currentFull.split('/').pop();
+    } catch (e) {
+        console.error('Error loading tuning files:', e);
+    }
+}
+
+async function saveTuningFile() {
+    const select = document.getElementById('tuningFileSelect');
+    const filename = select.value;
+    const fullPath = filename ? `/usr/share/libcamera/ipa/rpi/vc4/${filename}` : '';
+
+    showConfirmation(`Set camera tuning file to "${filename || 'None'}"? This writes mediamtx.yml directly and restarts the camera server.`, async (confirmed) => {
+        if (!confirmed) return;
+
+        try {
+            const response = await fetch('/api/mediamtx/tuning-file', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({tuning_file: fullPath})
+            });
+
+            if (response.ok) {
+                setTimeout(() => sys_stream('restart_cameraserver'), 500);
+            } else {
+                const result = await response.json();
+                showMessage('Error: ' + result.message, true);
+            }
+        } catch (e) {
+            showMessage('Network error while saving.', true);
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', loadTuningFiles);
+
 const modal = document.getElementById('customModal');
 const modalMessage = document.getElementById('modalMessage');
 const modalConfirmBtn = document.getElementById('modalConfirmBtn');

@@ -19,6 +19,7 @@ MEDIAMTX_API_HOST= "http://127.0.0.1:9997"
 RPI_PREFIX = "rpi"
 USER_FILE = '/root/auth_users.txt'
 MEDIAMTX_CONFIG_PATH = '/root/mediamtx.yml'
+TUNING_FILES_DIR = '/usr/share/libcamera/ipa/rpi/vc4'
 THERMAL_ZONE_PATH = '/sys/class/thermal/thermal_zone0/temp'
 HOSTNAME_FILE = '/etc/hostname'
 HOSTNAME_RE = re.compile(r'^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$')
@@ -321,6 +322,16 @@ def format_dict_for_html(data):
 
 app.jinja_env.globals.update(format_dict_for_html=format_dict_for_html)
 
+@app.route('/api/mediamtx/tuning-files', methods=['GET'])
+def list_tuning_files():
+    try:
+        if not os.path.isdir(TUNING_FILES_DIR):
+            return jsonify({'files': []})
+        files = sorted(f for f in os.listdir(TUNING_FILES_DIR) if f.endswith('.json'))
+        return jsonify({'files': files})
+    except Exception as e:
+        return jsonify({'files': [], 'error': str(e)}), 500
+
 @app.route('/api/mediamtx/cam', methods=['PATCH'])
 @basic_auth_required
 def patch_mediamtx_cam_path_config():
@@ -606,6 +617,42 @@ def save_config_file():
         with open(MEDIAMTX_CONFIG_PATH, 'w') as f:
             f.write(content)
         return jsonify({"status": "success", "message": "Gespeichert!"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/mediamtx/tuning-file', methods=['POST'])
+@basic_auth_required
+def set_tuning_file():
+    """Writes rpiCameraTuningFile directly into mediamtx.yml (persistent)."""
+    data = request.get_json() or {}
+    tuning_file = data.get('tuning_file', '').strip()
+
+    if not os.path.exists(MEDIAMTX_CONFIG_PATH):
+        return jsonify({"status": "error", "message": f"{MEDIAMTX_CONFIG_PATH} not found"}), 404
+
+    try:
+        with open(MEDIAMTX_CONFIG_PATH, 'r') as f:
+            content = f.read()
+
+        new_content, count = re.subn(
+            r'^(\s*rpiCameraTuningFile:).*$',
+            lambda m: m.group(1) + (f' {tuning_file}' if tuning_file else ''),
+            content,
+            count=1,
+            flags=re.MULTILINE
+        )
+
+        if count == 0:
+            return jsonify({
+                "status": "error",
+                "message": "rpiCameraTuningFile key not found in mediamtx.yml"
+            }), 404
+
+        os.system(f'cp {MEDIAMTX_CONFIG_PATH} {MEDIAMTX_CONFIG_PATH}.bak')
+        with open(MEDIAMTX_CONFIG_PATH, 'w') as f:
+            f.write(new_content)
+
+        return jsonify({"status": "success", "message": "Tuning file saved to mediamtx.yml."})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 

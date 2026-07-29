@@ -164,8 +164,18 @@
                 <span id="mediamtxToggle" class="toggle-icon">▼</span>
             </h2>
             <div id="mediamtxConfig" style="display:none; margin-top: 12px;">
-                <div class="toggle-header" onclick="toggleConfig('pathCamConfigWrapper', 'pathCamToggle')" style="margin-bottom: 5px;">
-                    <h3 style="margin: 0;">'cam' path settings</h3>
+                <div style="margin-bottom: 16px;">
+                    <label for="tuningFileSelect">Camera Tuning File</label>
+                    <div class="row" style="align-items: center;">
+                        <select id="tuningFileSelect" data-current="{{ mediamtx_config.path_cam.rpiCameraTuningFile or '' }}">
+                            <option value="">None</option>
+                        </select>
+                        <button class="btn-blue" onclick="saveTuningFile()" style="flex: 0 0 auto; margin-top: 6px;">Apply</button>
+                    </div>
+                </div>
+                <button class="btn-blue" style="margin-top: 5px;" onclick="openEditor()">Open Config Editor (persistent changes)</button>
+                <div class="toggle-header" onclick="toggleConfig('pathCamConfigWrapper', 'pathCamToggle')" style="margin-bottom: 5px; margin-top: 12px;"">
+                    <h3 style="margin: 0;">Cam path temp settings</h3>
                     <span id="pathCamToggle" class="toggle-icon">▼</span>
                 </div>
                 <div id="pathCamConfigWrapper" style="display:none; padding-left: 5px; border-left: 2px solid var(--border);">
@@ -188,7 +198,6 @@
                         </div>
                     {% endif %}
                 </div>
-                <button class="btn-blue" onclick="openEditor()">Open Config Editor (persistent changes)</button>
             </div>
         </div>
 
