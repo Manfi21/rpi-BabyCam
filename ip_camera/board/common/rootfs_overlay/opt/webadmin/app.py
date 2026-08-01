@@ -12,6 +12,7 @@ import shutil
 import socket
 import re
 import shlex
+from update_os_files import compare_and_print_config_changes
 
 app = Flask(__name__)
 
@@ -497,10 +498,46 @@ def system_stream():
     commands = {
         "update_mediamtx": "/opt/webadmin/update_mediamtx.sh",
         "update_webserver": "/opt/webadmin/update_webserver.sh",
+        "sync_os_files": "python3 -u /opt/webadmin/update_os_files.py",
         "setup_tailscale": "tailscale up",
         "restart_cameraserver": "/etc/init.d/S99start_mediamtx restart",
         "restart_webserver": "/etc/init.d/S99webadmin restart"
     }
+
+    if action == "show_MTX_changes":
+        def generate_diff():
+            new_file = MEDIAMTX_CONFIG_PATH + ".new"
+            if not os.path.exists(new_file):
+                yield f"data: Error: No file to compare found -> {new_file}\n\n"
+            else:
+                # Wir leiten print() direkt in den SSE-Stream um
+                class StreamCapturer:
+                    def write(self, text):
+                        if text.strip():
+                            for line in text.splitlines():
+                                yield_queue.append(line)
+                    def flush(self):
+                        pass
+
+                yield_queue = []
+
+                import io
+                import sys
+
+                old_stdout = sys.stdout
+                sys.stdout = io.StringIO()
+                try:
+                    compare_and_print_config_changes(MEDIAMTX_CONFIG_PATH, new_file)
+                    output = sys.stdout.getvalue()
+                finally:
+                    sys.stdout = old_stdout
+
+                for line in output.splitlines():
+                    yield f"data: {line}\n\n"
+
+            yield "data: --- DONE ---\n\n"
+
+        return Response(generate_diff(), mimetype='text/event-stream')
 
     if action not in commands:
         return "event: message\ndata: Unknown action\n\n", 400

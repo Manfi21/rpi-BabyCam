@@ -123,7 +123,9 @@
                     <button class="btn-blue" onclick="sys_stream('update_mediamtx')">Update Camera Server</button>
                     <button class="btn-blue" onclick="sys_stream('update_webserver')">Update Webserver</button>
                     <button class="btn-blue" onclick="sys_stream('setup_tailscale')">Setup Tailscale</button>
-
+                </div>
+                <div class="row" style="margin-bottom: 10px;">
+                    <button class="btn-blue" onclick="sys_stream('sync_os_files')">Sync New OS Files</button>
                 </div>
                 <div style="margin-top: 20px;">
                     <h3>Web Basic Auth</h3>
@@ -215,7 +217,9 @@
                         >Adjust Crop</button>
                     </div>
                 </div>
-                <button class="btn-blue" style="margin-top: 5px;" onclick="openEditor()">Open Config Editor (persistent changes)</button>
+                <div>
+                    <button class="btn-blue" style="margin-top: 5px;" onclick="openEditor()">Open Config Editor (persistent changes)</button>
+                    <button class="btn-blue" style="margin-top: 5px;" onclick="sys_stream('show_MTX_changes')">Show Config changes</button>
                 <div class="toggle-header" onclick="toggleConfig('pathCamConfigWrapper', 'pathCamToggle')" style="margin-bottom: 5px; margin-top: 12px;">
                     <label>Cam path temp settings</label>
                     <span id="pathCamToggle" class="toggle-icon">▼</span>

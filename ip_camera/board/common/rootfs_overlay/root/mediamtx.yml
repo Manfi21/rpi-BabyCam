@@ -614,7 +614,7 @@ pathDefaults:
   # frames per second.
   rpiCameraFPS: 30
   # Autofocus mode (auto, manual or continuous).
-  rpiCameraAfMode: continuous
+  rpiCameraAfMode: auto
   # Autofocus range (normal, macro or full).
   rpiCameraAfRange: normal
   # Autofocus speed (normal or fast).
