@@ -24,10 +24,16 @@
         <div class="col">
         <div class="card">
             <h2>Status</h2>
-            <label for="hostnameInput">Hostname</label>
-            <div class="row" style="align-items: center;">
-                <input type="text" id="hostnameInput" value="{{ hostname }}" placeholder="babycam" style="margin-top: 6px;">
-                <button class="btn-blue" onclick="saveHostname()" style="flex: 0 0 auto; margin-top: 6px;">Save &amp; apply</button>
+            <div class="toggle-header" onclick="toggleConfig('hostnameConfig', 'hostnameToggle')">
+                <span>Hostname</span> <span>{{ hostname }}</span>
+<!--             <label for="hostnameInput">Hostname</label> -->
+                <span id="hostnameToggle" class="toggle-icon">▼</span>
+            </div>
+            <div id="hostnameConfig" style="display:none;">
+                <div class="row" style="align-items: center">
+                    <input type="text" id="hostnameInput" value="{{ hostname }}" placeholder="babycam" style="margin-top: 6px;">
+                    <button class="btn-blue" onclick="saveHostname()" style="flex: 0 0 auto; margin-top: 6px;">Save &amp; apply</button>
+                </div>
             </div>
             <div style="margin-top: 18px; border-top: 1px solid var(--border); padding-top: 14px;">
                 <div class="info-row"><span>WIFI (SSID)</span> <strong>{{ ssid }}</strong></div>
@@ -37,18 +43,41 @@
         </div>
 
         <div class="card">
-            <h2>Stream Postfix</h2>
-            <form action="/settings" method="POST" onsubmit="savePostfixToLocal()">
-                <label for="streamPostfixInput">Postfix:</label>
-                <div class="row" style="align-items: center;">
-                    <input type="text" name="stream_postfix" id="streamPostfixInput" value="{{ stream_postfix }}">
-                    <button class="btn-blue" type="submit" style="flex: 0 0 auto; margin-top: 6px;">Save</button>
+            <h2>System Monitor</h2>
+            <div class="stats-grid">
+                <div>
+                    <div class="gauge" id="cpuGauge"><div class="gauge-value"><span id="cpuValue">–</span><small>%</small></div></div>
+                    <div class="gauge-label">CPU</div>
+                    <div class="gauge-detail" id="cpuCoreCount">–</div>
                 </div>
-            </form>
-        </div>
+                <div>
+                    <div class="gauge" id="memGauge"><div class="gauge-value"><span id="memValue">–</span><small>%</small></div></div>
+                    <div class="gauge-label">RAM</div>
+                    <div class="gauge-detail" id="memDetail">–</div>
+                </div>
+                <div>
+                    <div class="gauge" id="diskGauge"><div class="gauge-value"><span id="diskValue">–</span><small>%</small></div></div>
+                    <div class="gauge-label">Disk</div>
+                    <div class="gauge-detail" id="diskDetail">–</div>
+                </div>
+                <div>
+                    <div class="gauge" id="tempGauge"><div class="gauge-value"><span id="tempValue">–</span><small>°C</small></div></div>
+                    <div class="gauge-label">Temp</div>
+                    <div class="gauge-detail">CPU</div>
+                </div>
+            </div>
+            <div class="meta-row">
+                <div class="meta-item">
+                    <div class="meta-label">Load avg (1/5/15m)</div>
+                    <div class="meta-value" id="loadAverage">– / – / –</div>
+                </div>
+                <div class="meta-item">
+                    <div class="meta-label">Uptime</div>
+                    <div class="meta-value" id="uptimeValue">–</div>
+                </div>
+            </div>
         </div>
 
-        <div class="col">
         <div class="card">
             <h2>Wifi Settings</h2>
             <div id="wifiStatusMessage" style="padding: 10px; margin-bottom: 15px; display: none;"></div>
@@ -119,51 +148,50 @@
                 </div>
             </div>
         </div>
-        </div>
-        </div>
 
         <div class="card">
-            <h2>System Monitor</h2>
-            <div class="stats-grid">
-                <div>
-                    <div class="gauge" id="cpuGauge"><div class="gauge-value"><span id="cpuValue">–</span><small>%</small></div></div>
-                    <div class="gauge-label">CPU</div>
-                    <div class="gauge-detail" id="cpuCoreCount">–</div>
-                </div>
-                <div>
-                    <div class="gauge" id="memGauge"><div class="gauge-value"><span id="memValue">–</span><small>%</small></div></div>
-                    <div class="gauge-label">RAM</div>
-                    <div class="gauge-detail" id="memDetail">–</div>
-                </div>
-                <div>
-                    <div class="gauge" id="diskGauge"><div class="gauge-value"><span id="diskValue">–</span><small>%</small></div></div>
-                    <div class="gauge-label">Disk</div>
-                    <div class="gauge-detail" id="diskDetail">–</div>
-                </div>
-                <div>
-                    <div class="gauge" id="tempGauge"><div class="gauge-value"><span id="tempValue">–</span><small>°C</small></div></div>
-                    <div class="gauge-label">Temp</div>
-                    <div class="gauge-detail">CPU</div>
-                </div>
-            </div>
-            <div class="meta-row">
-                <div class="meta-item">
-                    <div class="meta-label">Load avg (1/5/15m)</div>
-                    <div class="meta-value" id="loadAverage">– / – / –</div>
-                </div>
-                <div class="meta-item">
-                    <div class="meta-label">Uptime</div>
-                    <div class="meta-value" id="uptimeValue">–</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="card">
-            <h2 class="toggle-header" onclick="toggleConfig('mediamtxConfig', 'mediamtxToggle')">
-                <span>MediaMTX configuration</span>
-                <span id="mediamtxToggle" class="toggle-icon">▼</span>
+            <h2 class="toggle-header" onclick="toggleLogsPanel()">
+                <span>System Logs</span>
+                <span id="logsToggle" class="toggle-icon">▼</span>
             </h2>
-            <div id="mediamtxConfig" style="display:none; margin-top: 12px;">
+            <div id="logsWrapper" style="display:none; margin-top: 12px;">
+                <div class="log-toolbar">
+                    <div class="log-sources">
+                        <button class="btn-ghost log-source-btn active" onclick="selectLogSource('webadmin', this)">Webadmin</button>
+                        <button class="btn-ghost log-source-btn" onclick="selectLogSource('mediamtx', this)">MediaMTX</button>
+                    </div>
+                    <div class="log-status">
+                        <span id="logStatusDot" class="status-dot"></span>
+                        <span id="logStatusLabel">Disconnected</span>
+                    </div>
+                    <div class="log-actions">
+                        <label class="checkbox-label"><input type="checkbox" id="logAutoscroll" checked> Autoscroll</label>
+                        <button class="btn-ghost" id="logToggleBtn" onclick="toggleLogStream()">Pause</button>
+                        <button class="btn-ghost" onclick="clearLogView()">Clear</button>
+                    </div>
+                </div>
+                <div id="logOutput" class="log-console"></div>
+            </div>
+        </div>
+        </div>
+
+        <div class="col">
+        <div class="card">
+            <h2>Stream Postfix</h2>
+            <form action="/settings" method="POST" onsubmit="savePostfixToLocal()">
+                <label for="streamPostfixInput">Postfix:</label>
+                <div class="row" style="align-items: center;">
+                    <input type="text" name="stream_postfix" id="streamPostfixInput" value="{{ stream_postfix }}">
+                    <button class="btn-blue" type="submit" style="flex: 0 0 auto; margin-top: 6px;">Save</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2>
+                <span>Camera settings</span>
+            </h2>
+            <div id="mediamtxConfig" style="margin-top: 12px;">
                 <div style="margin-bottom: 16px;">
                     <label for="tuningFileSelect">Camera Tuning File</label>
                     <div class="row" style="align-items: center;">
@@ -216,29 +244,30 @@
         </div>
 
         <div class="card">
-            <h2 class="toggle-header" onclick="toggleLogsPanel()">
-                <span>System Logs</span>
-                <span id="logsToggle" class="toggle-icon">▼</span>
+            <h2>
+                <span>Audio settings</span>
             </h2>
-            <div id="logsWrapper" style="display:none; margin-top: 12px;">
-                <div class="log-toolbar">
-                    <div class="log-sources">
-                        <button class="btn-ghost log-source-btn active" onclick="selectLogSource('webadmin', this)">Webadmin</button>
-                        <button class="btn-ghost log-source-btn" onclick="selectLogSource('mediamtx', this)">MediaMTX</button>
-                    </div>
-                    <div class="log-status">
-                        <span id="logStatusDot" class="status-dot"></span>
-                        <span id="logStatusLabel">Disconnected</span>
-                    </div>
-                    <div class="log-actions">
-                        <label class="checkbox-label"><input type="checkbox" id="logAutoscroll" checked> Autoscroll</label>
-                        <button class="btn-ghost" id="logToggleBtn" onclick="toggleLogStream()">Pause</button>
-                        <button class="btn-ghost" onclick="clearLogView()">Clear</button>
-                    </div>
+            <div id="audioConfig" style="margin-top: 12px;">
+                <label for="audioControlSelect">Audio Control</label>
+                <select id="audioControlSelect" onchange="loadAudioStatus()"></select>
+
+                <div id="audioVolumeWrapper">
+                    <label for="audioVolumeSlider">Volume: <span id="audioVolumeValue">–</span>%</label>
+                    <input type="range" id="audioVolumeSlider" min="0" max="100" value="0" oninput="onAudioVolumeInput()">
                 </div>
-                <div id="logOutput" class="log-console"></div>
+
+                <div class="row" style="align-items: center; margin-top: 16px;">
+                    <label class="checkbox-label" style="margin-top: 0;">
+                        <input type="checkbox" id="audioMuteCheckbox" onchange="applyAudioMute()"> Mute
+                    </label>
+                    <button class="btn-blue" id="audioApplyVolumeBtn" onclick="applyAudioVolume()" style="flex: 0 0 auto; margin-top: 0;">Apply Volume</button>
+                </div>
             </div>
         </div>
+
+        </div>
+        </div>
+
         </div>
     </div>
 

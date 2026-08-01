@@ -11,10 +11,12 @@ import base64
 import shutil
 import socket
 import re
+import shlex
 
 app = Flask(__name__)
 
 CONFIG_FILE_PATH = 'stream_postfix.txt'
+AUDIO_CONFIG_PATH = 'audio_config.json'
 MEDIAMTX_API_HOST= "http://127.0.0.1:9997"
 RPI_PREFIX = "rpi"
 USER_FILE = '/root/auth_users.txt'
@@ -230,6 +232,42 @@ def get_load_average():
         return os.getloadavg()
     except Exception:
         return (0.0, 0.0, 0.0)
+
+# -----------------------
+# Audio (ALSA mixer)
+# -----------------------
+def get_audio_controls():
+    output = run_command("amixer scontrols")
+    return re.findall(r"Simple mixer control '([^']+)'", output)
+
+def get_audio_status(control):
+    output = run_command(f"amixer sget {shlex.quote(control)}")
+    percent_match = re.search(r'\[(\d+)%\]', output)
+    percent = int(percent_match.group(1)) if percent_match else 0
+    on_off = re.findall(r'\[(on|off)\]', output)
+    muted = bool(on_off) and all(state == 'off' for state in on_off)
+    return {'percent': percent, 'muted': muted, 'has_volume': percent_match is not None}
+
+def apply_audio_volume(control, percent):
+    run_command(f"amixer sset {shlex.quote(control)} {int(percent)}%")
+
+def apply_audio_mute(control, muted):
+    if get_audio_status(control)['muted'] != muted:
+        run_command(f"amixer sset {shlex.quote(control)} toggle")
+
+def save_audio_config(control, percent, muted):
+    try:
+        with open(AUDIO_CONFIG_PATH, 'w') as f:
+            json.dump({'control': control, 'percent': percent, 'muted': muted}, f)
+    except Exception as e:
+        print(f"[ERROR] Could not save audio config: {e}")
+
+def load_audio_config():
+    try:
+        with open(AUDIO_CONFIG_PATH, 'r') as f:
+            return json.load(f)
+    except Exception:
+        return None
 
 # -----------------------
 # MediaMTX API
@@ -488,6 +526,63 @@ def system_stream():
 
     return Response(generate(), mimetype='text/event-stream')
 
+@app.route('/api/audio/controls', methods=['GET'])
+def api_audio_controls():
+    try:
+        return jsonify({'controls': get_audio_controls()})
+    except Exception as e:
+        return jsonify({'controls': [], 'error': str(e)}), 500
+
+@app.route('/api/audio/status', methods=['GET'])
+def api_audio_status():
+    control = request.args.get('control', '')
+    if not control or control not in get_audio_controls():
+        return jsonify({'error': 'Unknown audio control'}), 404
+    try:
+        return jsonify(get_audio_status(control))
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/audio/volume', methods=['POST'])
+def api_audio_volume():
+    data = request.get_json() or {}
+    control = data.get('control', '')
+    percent = data.get('percent')
+
+    if not control or control not in get_audio_controls():
+        return jsonify({'status': 'error', 'message': 'Unknown audio control'}), 404
+    if not isinstance(percent, int) or not (0 <= percent <= 100):
+        return jsonify({'status': 'error', 'message': 'percent must be an integer between 0 and 100'}), 400
+    if not get_audio_status(control)['has_volume']:
+        return jsonify({'status': 'error', 'message': f'"{control}" has no volume control, only on/off'}), 400
+
+    try:
+        apply_audio_volume(control, percent)
+        status = get_audio_status(control)
+        save_audio_config(control, percent, status['muted'])
+        return jsonify({'status': 'success', 'message': f'Volume set to {percent}%'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/audio/mute', methods=['POST'])
+def api_audio_mute():
+    data = request.get_json() or {}
+    control = data.get('control', '')
+    muted = data.get('muted')
+
+    if not control or control not in get_audio_controls():
+        return jsonify({'status': 'error', 'message': 'Unknown audio control'}), 404
+    if not isinstance(muted, bool):
+        return jsonify({'status': 'error', 'message': 'muted must be a boolean'}), 400
+
+    try:
+        apply_audio_mute(control, muted)
+        status = get_audio_status(control)
+        save_audio_config(control, status['percent'], muted)
+        return jsonify({'status': 'success', 'message': 'Mute updated' if muted else 'Unmuted'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 @app.route('/api/system/stats', methods=['GET'])
 def system_stats():
     load1, load5, load15 = get_load_average()
@@ -744,6 +839,15 @@ def stream_page():
 # -----------------------
 if __name__ == '__main__':
     os.environ['PATH'] = os.environ.get('PATH', '') + ':/sbin:/usr/sbin'
+
+    saved_audio = load_audio_config()
+    if saved_audio:
+        try:
+            apply_audio_volume(saved_audio['control'], saved_audio['percent'])
+            apply_audio_mute(saved_audio['control'], saved_audio['muted'])
+        except Exception as e:
+            print(f"[WARN] Could not restore audio settings: {e}")
+
     try:
         app.run(host='0.0.0.0', port=80)
     except PermissionError:

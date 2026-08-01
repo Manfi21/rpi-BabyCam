@@ -299,6 +299,108 @@ function submitRoi(roiString, confirmMsg) {
     });
 }
 
+// -----------------------
+// Audio settings
+// -----------------------
+async function loadAudioControls() {
+    const select = document.getElementById('audioControlSelect');
+    if (!select) return;
+
+    try {
+        const res = await fetch('/api/audio/controls');
+        const data = await res.json();
+
+        select.innerHTML = '';
+        (data.controls || []).forEach(name => {
+            const opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = name;
+            select.appendChild(opt);
+        });
+
+        if (select.options.length > 0) {
+            await loadAudioStatus();
+        }
+    } catch (e) {
+        console.error('Error loading audio controls:', e);
+    }
+}
+
+async function loadAudioStatus() {
+    const select = document.getElementById('audioControlSelect');
+    const control = select.value;
+    if (!control) return;
+
+    try {
+        const res = await fetch('/api/audio/status?control=' + encodeURIComponent(control));
+        const data = await res.json();
+        const percent = data.percent ?? 0;
+        const hasVolume = !!data.has_volume;
+
+        document.getElementById('audioVolumeSlider').value = percent;
+        document.getElementById('audioVolumeValue').textContent = percent;
+        document.getElementById('audioMuteCheckbox').checked = !!data.muted;
+
+        document.getElementById('audioVolumeWrapper').style.display = hasVolume ? '' : 'none';
+        document.getElementById('audioApplyVolumeBtn').style.display = hasVolume ? '' : 'none';
+    } catch (e) {
+        console.error('Error loading audio status:', e);
+    }
+}
+
+function onAudioVolumeInput() {
+    const value = document.getElementById('audioVolumeSlider').value;
+    document.getElementById('audioVolumeValue').textContent = value;
+}
+
+async function applyAudioVolume() {
+    const control = document.getElementById('audioControlSelect').value;
+    const percent = parseInt(document.getElementById('audioVolumeSlider').value, 10);
+
+    if (!control) {
+        showMessage('No audio control available.', true);
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/audio/volume', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({control: control, percent: percent})
+        });
+        const data = await res.json();
+        if (res.ok) {
+            // showMessage(data.message || 'Volume updated');
+        } else {
+            showMessage(data.message || 'Failed to update volume', true);
+        }
+    } catch (e) {
+        showMessage('Network error: ' + e.message, true);
+    }
+}
+
+async function applyAudioMute() {
+    const control = document.getElementById('audioControlSelect').value;
+    const muted = document.getElementById('audioMuteCheckbox').checked;
+    if (!control) return;
+
+    try {
+        const res = await fetch('/api/audio/mute', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({control: control, muted: muted})
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            showMessage(data.message || 'Failed to update mute state', true);
+        }
+    } catch (e) {
+        showMessage('Network error: ' + e.message, true);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', loadAudioControls);
+
 const modal = document.getElementById('customModal');
 const modalMessage = document.getElementById('modalMessage');
 const modalConfirmBtn = document.getElementById('modalConfirmBtn');

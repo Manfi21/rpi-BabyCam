@@ -765,7 +765,7 @@ paths:
       gst-launch-1.0
       rtspclientsink name=s location=rtsp://127.0.0.1:$RTSP_PORT/cam_with_audio
       rtspsrc location=rtsp://127.0.0.1:$RTSP_PORT/cam latency=0 ! rtph264depay ! s.
-      alsasrc device=hw:0 ! opusenc bitrate=8000 ! s.
+      alsasrc device=hw:0 ! audioconvert ! audioresample ! webrtcdsp echo-cancel=false noise-suppression-level=high ! audioconvert ! opusenc bitrate=8000 ! s.
     runOnDemandRestart: yes
 
   all_others:
