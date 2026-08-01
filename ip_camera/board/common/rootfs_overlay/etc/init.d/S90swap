@@ -1,0 +1,71 @@
+#!/bin/sh
+# /etc/init.d/S90swap
+
+SWAPFILE="/swapfile"
+SWAPSIZE="1G"
+
+start() {
+    if grep -q "^${SWAPFILE}" /proc/swaps; then
+        echo "Swap is already active."
+        return 0
+    fi
+
+    if [ ! -f "${SWAPFILE}" ]; then
+        echo "Swapfile not found. Creating ${SWAPSIZE} swapfile at ${SWAPFILE}..."
+
+        if ! fallocate -l "${SWAPSIZE}" "${SWAPFILE}" >/dev/null 2>&1; then
+            echo "Error: Failed to create swapfile." >&2
+            return 1
+        fi
+
+        chmod 600 "${SWAPFILE}"
+
+        echo "Formatting swapfile..."
+        if ! mkswap "${SWAPFILE}" >/dev/null 2>&1; then
+            echo "Error: Failed to format swapfile." >&2
+            return 1
+        fi
+    else
+        echo "Swapfile exists but is not active."
+    fi
+
+    echo "Activating swap..."
+    if swapon "${SWAPFILE}"; then
+        echo "Swap activated successfully."
+    else
+        echo "Error: Failed to activate swap." >&2
+        return 1
+    fi
+}
+
+stop() {
+    if grep -q "^${SWAPFILE}" /proc/swaps; then
+        echo "Deactivating swap..."
+        if swapoff "${SWAPFILE}"; then
+            echo "Swap deactivated successfully."
+        else
+            echo "Error: Failed to deactivate swap." >&2
+            return 1
+        fi
+    else
+        echo "Swap is not active."
+    fi
+}
+
+case "$1" in
+    start)
+        start
+        ;;
+    stop)
+        stop
+        ;;
+    restart|reload)
+        stop
+        start
+        ;;
+    *)
+        echo "Error: Usage $0 {start|stop|restart}" >&2
+        exit 1
+esac
+
+exit 0
