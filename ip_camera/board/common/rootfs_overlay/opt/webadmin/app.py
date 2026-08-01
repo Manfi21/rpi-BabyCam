@@ -620,6 +620,29 @@ def save_config_file():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
+def write_mediamtx_yaml_key(key, value):
+    """Replaces a single `key:` line in mediamtx.yml in-place (with backup)."""
+    if not os.path.exists(MEDIAMTX_CONFIG_PATH):
+        raise FileNotFoundError(f"{MEDIAMTX_CONFIG_PATH} not found")
+
+    with open(MEDIAMTX_CONFIG_PATH, 'r') as f:
+        content = f.read()
+
+    new_content, count = re.subn(
+        rf'^(\s*{re.escape(key)}:).*$',
+        lambda m: m.group(1) + (f' {value}' if value else ''),
+        content,
+        count=1,
+        flags=re.MULTILINE
+    )
+
+    if count == 0:
+        raise KeyError(f"{key} key not found in mediamtx.yml")
+
+    os.system(f'cp {MEDIAMTX_CONFIG_PATH} {MEDIAMTX_CONFIG_PATH}.bak')
+    with open(MEDIAMTX_CONFIG_PATH, 'w') as f:
+        f.write(new_content)
+
 @app.route('/api/mediamtx/tuning-file', methods=['POST'])
 @basic_auth_required
 def set_tuning_file():
@@ -627,32 +650,31 @@ def set_tuning_file():
     data = request.get_json() or {}
     tuning_file = data.get('tuning_file', '').strip()
 
-    if not os.path.exists(MEDIAMTX_CONFIG_PATH):
-        return jsonify({"status": "error", "message": f"{MEDIAMTX_CONFIG_PATH} not found"}), 404
+    try:
+        write_mediamtx_yaml_key('rpiCameraTuningFile', tuning_file)
+        return jsonify({"status": "success", "message": "Tuning file saved to mediamtx.yml."})
+    except (FileNotFoundError, KeyError) as e:
+        return jsonify({"status": "error", "message": str(e)}), 404
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/mediamtx/roi', methods=['POST'])
+@basic_auth_required
+def set_roi():
+    """Writes rpiCameraROI directly into mediamtx.yml (persistent)."""
+    data = request.get_json() or {}
+    roi = data.get('roi', '').strip()
+
+    if roi:
+        parts = roi.split(',')
+        if len(parts) != 4 or not all(re.match(r'^-?\d+(\.\d+)?$', p) for p in parts):
+            return jsonify({"status": "error", "message": "ROI must be in format x,y,width,height"}), 400
 
     try:
-        with open(MEDIAMTX_CONFIG_PATH, 'r') as f:
-            content = f.read()
-
-        new_content, count = re.subn(
-            r'^(\s*rpiCameraTuningFile:).*$',
-            lambda m: m.group(1) + (f' {tuning_file}' if tuning_file else ''),
-            content,
-            count=1,
-            flags=re.MULTILINE
-        )
-
-        if count == 0:
-            return jsonify({
-                "status": "error",
-                "message": "rpiCameraTuningFile key not found in mediamtx.yml"
-            }), 404
-
-        os.system(f'cp {MEDIAMTX_CONFIG_PATH} {MEDIAMTX_CONFIG_PATH}.bak')
-        with open(MEDIAMTX_CONFIG_PATH, 'w') as f:
-            f.write(new_content)
-
-        return jsonify({"status": "success", "message": "Tuning file saved to mediamtx.yml."})
+        write_mediamtx_yaml_key('rpiCameraROI', roi)
+        return jsonify({"status": "success", "message": "Crop saved to mediamtx.yml."})
+    except (FileNotFoundError, KeyError) as e:
+        return jsonify({"status": "error", "message": str(e)}), 404
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 

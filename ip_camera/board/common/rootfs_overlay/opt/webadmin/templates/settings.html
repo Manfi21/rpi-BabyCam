@@ -173,9 +173,23 @@
                         <button class="btn-blue" onclick="saveTuningFile()" style="flex: 0 0 auto; margin-top: 6px;">Apply</button>
                     </div>
                 </div>
+                <div style="margin-bottom: 16px;">
+                    <label>Camera Crop (Region of Interest)</label>
+                    <div class="info-row"><span>Current crop</span> <strong id="roiCurrentValue">{{ mediamtx_config.path_cam.rpiCameraROI or 'Full frame' }}</strong>
+                        <button
+                            class="btn-blue"
+                            id="openCropBtn"
+                            onclick="openCropSelector()"
+                            data-width="{{ mediamtx_config.path_cam.rpiCameraWidth or 1920 }}"
+                            data-height="{{ mediamtx_config.path_cam.rpiCameraHeight or 1080 }}"
+                            data-current-roi="{{ mediamtx_config.path_cam.rpiCameraROI or '' }}"
+                            data-postfix="{{ stream_postfix or '/cam' }}"
+                        >Adjust Crop</button>
+                    </div>
+                </div>
                 <button class="btn-blue" style="margin-top: 5px;" onclick="openEditor()">Open Config Editor (persistent changes)</button>
-                <div class="toggle-header" onclick="toggleConfig('pathCamConfigWrapper', 'pathCamToggle')" style="margin-bottom: 5px; margin-top: 12px;"">
-                    <h3 style="margin: 0;">Cam path temp settings</h3>
+                <div class="toggle-header" onclick="toggleConfig('pathCamConfigWrapper', 'pathCamToggle')" style="margin-bottom: 5px; margin-top: 12px;">
+                    <label>Cam path temp settings</label>
                     <span id="pathCamToggle" class="toggle-icon">▼</span>
                 </div>
                 <div id="pathCamConfigWrapper" style="display:none; padding-left: 5px; border-left: 2px solid var(--border);">
@@ -244,6 +258,24 @@
             <h3>Live Output</h3>
             <pre id="streamOutput" class="log-console" style="height:300px;"></pre>
             <button class="btn-blue" onclick="closeStream()">Close</button>
+        </div>
+    </div>
+    <div id="cropModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 720px; width: 90%;">
+            <h3>Adjust Camera Crop</h3>
+            <p style="font-size: 0.85em; color: var(--text-dim); margin-top: -8px;">
+                Drag a rectangle on the live image to select the visible area.
+            </p>
+            <div id="cropStage" class="crop-stage">
+                <iframe id="cropFrame" class="crop-frame" allow="autoplay"></iframe>
+                <div id="cropOverlay" class="crop-overlay"></div>
+                <div id="cropSelection" class="crop-selection"></div>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn-green" onclick="applyCropSelection()">Apply Crop</button>
+                <button class="btn-ghost" onclick="resetCropSelection()">Reset to Full Frame</button>
+                <button class="btn-red" onclick="closeCropSelector()">Cancel</button>
+            </div>
         </div>
     </div>
     <script id="pathCamRawJson" type="application/json">

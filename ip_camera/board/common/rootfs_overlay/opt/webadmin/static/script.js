@@ -131,6 +131,174 @@ async function saveTuningFile() {
 
 document.addEventListener('DOMContentLoaded', loadTuningFiles);
 
+// -----------------------
+// Camera Crop (ROI) selector
+// -----------------------
+const cropState = {
+    width: 1920,
+    height: 1080,
+    currentRoi: [0, 0, 1, 1], // x, y, w, h of the currently VISIBLE frame, relative to the full sensor
+    dragging: false,
+    startX: 0,
+    startY: 0,
+    stageW: 0,
+    stageH: 0,
+    rect: null // {x, y, w, h} normalized to the currently visible frame (0-1)
+};
+
+function parseRoi(str) {
+    if (!str) return [0, 0, 1, 1];
+    const parts = str.split(',').map(Number);
+    if (parts.length !== 4 || parts.some(isNaN)) return [0, 0, 1, 1];
+    return parts;
+}
+
+function openCropSelector() {
+    const btn = document.getElementById('openCropBtn');
+    cropState.width = parseInt(btn.dataset.width, 10) || 1920;
+    cropState.height = parseInt(btn.dataset.height, 10) || 1080;
+    cropState.currentRoi = parseRoi(btn.dataset.currentRoi);
+    cropState.rect = null;
+
+    document.getElementById('cropStage').style.aspectRatio = `${cropState.width} / ${cropState.height}`;
+
+    const sel = document.getElementById('cropSelection');
+    sel.style.display = 'none';
+
+    const host = window.location.hostname;
+    const postfix = btn.dataset.postfix || '/cam';
+    document.getElementById('cropFrame').src = `http://${host}:8889${postfix}?muted=1`;
+
+    document.getElementById('cropModal').style.display = 'flex';
+}
+
+function closeCropSelector() {
+    document.getElementById('cropModal').style.display = 'none';
+    document.getElementById('cropFrame').src = '';
+}
+
+function cropPointerPos(e, overlay) {
+    const rect = overlay.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return {
+        x: Math.min(Math.max(clientX - rect.left, 0), rect.width),
+        y: Math.min(Math.max(clientY - rect.top, 0), rect.height),
+        w: rect.width,
+        h: rect.height
+    };
+}
+
+function setupCropOverlayEvents() {
+    const overlay = document.getElementById('cropOverlay');
+    const sel = document.getElementById('cropSelection');
+    if (!overlay || !sel) return;
+
+    function start(e) {
+        const p = cropPointerPos(e, overlay);
+        cropState.dragging = true;
+        cropState.startX = p.x;
+        cropState.startY = p.y;
+        cropState.stageW = p.w;
+        cropState.stageH = p.h;
+        sel.style.left = p.x + 'px';
+        sel.style.top = p.y + 'px';
+        sel.style.width = '0px';
+        sel.style.height = '0px';
+        sel.style.display = 'block';
+        e.preventDefault();
+    }
+
+    function move(e) {
+        if (!cropState.dragging) return;
+        const p = cropPointerPos(e, overlay);
+        const left = Math.min(p.x, cropState.startX);
+        const top = Math.min(p.y, cropState.startY);
+        const width = Math.abs(p.x - cropState.startX);
+        const height = Math.abs(p.y - cropState.startY);
+        sel.style.left = left + 'px';
+        sel.style.top = top + 'px';
+        sel.style.width = width + 'px';
+        sel.style.height = height + 'px';
+        e.preventDefault();
+    }
+
+    function end() {
+        if (!cropState.dragging) return;
+        cropState.dragging = false;
+        const w = parseFloat(sel.style.width);
+        const h = parseFloat(sel.style.height);
+        if (w < 10 || h < 10) {
+            sel.style.display = 'none';
+            cropState.rect = null;
+            return;
+        }
+        cropState.rect = {
+            x: parseFloat(sel.style.left) / cropState.stageW,
+            y: parseFloat(sel.style.top) / cropState.stageH,
+            w: w / cropState.stageW,
+            h: h / cropState.stageH
+        };
+    }
+
+    overlay.addEventListener('mousedown', start);
+    overlay.addEventListener('mousemove', move);
+    overlay.addEventListener('mouseup', end);
+    overlay.addEventListener('touchstart', start, {passive: false});
+    overlay.addEventListener('touchmove', move, {passive: false});
+    overlay.addEventListener('touchend', end);
+}
+
+document.addEventListener('DOMContentLoaded', setupCropOverlayEvents);
+
+function composeRoi(base, sel) {
+    const [ox, oy, ow, oh] = base;
+    const nx = ox + sel.x * ow;
+    const ny = oy + sel.y * oh;
+    const nw = sel.w * ow;
+    const nh = sel.h * oh;
+    return [nx, ny, nw, nh].map(v => Math.max(0, Math.min(1, v)));
+}
+
+function applyCropSelection() {
+    if (!cropState.rect) {
+        showMessage('Please drag a selection on the image first.', true);
+        return;
+    }
+    const [x, y, w, h] = composeRoi(cropState.currentRoi, cropState.rect).map(v => v.toFixed(4));
+    const roiString = `${x},${y},${w},${h}`;
+    closeCropSelector();
+    submitRoi(roiString, `Apply crop ${roiString}? This writes mediamtx.yml and restarts the camera server.`);
+}
+
+function resetCropSelection() {
+    closeCropSelector();
+    submitRoi('', 'Reset crop to full frame? This writes mediamtx.yml and restarts the camera server.');
+}
+
+function submitRoi(roiString, confirmMsg) {
+    showConfirmation(confirmMsg, async (confirmed) => {
+        if (!confirmed) return;
+
+        try {
+            const response = await fetch('/api/mediamtx/roi', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({roi: roiString})
+            });
+
+            if (response.ok) {
+                setTimeout(() => sys_stream('restart_cameraserver'), 500);
+            } else {
+                const result = await response.json();
+                showMessage('Error: ' + result.message, true);
+            }
+        } catch (e) {
+            showMessage('Network error while saving.', true);
+        }
+    });
+}
+
 const modal = document.getElementById('customModal');
 const modalMessage = document.getElementById('modalMessage');
 const modalConfirmBtn = document.getElementById('modalConfirmBtn');
