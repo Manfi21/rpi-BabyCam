@@ -894,6 +894,6 @@ if __name__ == '__main__':
             print(f"[WARN] Could not restore audio settings: {e}")
 
     try:
-        app.run(host='0.0.0.0', port=80)
+        app.run(host='0.0.0.0', port=80, threaded=True)
     except PermissionError:
-        app.run(host='0.0.0.0', port=8000)
+        app.run(host='0.0.0.0', port=8000, threaded=True)

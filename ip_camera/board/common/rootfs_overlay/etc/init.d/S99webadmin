@@ -8,19 +8,24 @@ export PYTHONUNBUFFERED=1
 start() {
     echo -n "Starting $NAME: "
     cd $DIR
-    start-stop-daemon -S -b -m -p /var/run/$NAME.pid -O "$LOGFILE" --exec /usr/bin/python3 -- $DIR/app.py
+    if [ -x /usr/bin/gunicorn ]; then
+        start-stop-daemon -S -b -m -p /var/run/$NAME.pid -O "$LOGFILE" --exec /usr/bin/gunicorn -- -w 2 --threads 2 --timeout 0 -b 0.0.0.0:80 --chdir $DIR app:app
+    else
+        start-stop-daemon -S -b -m -p /var/run/$NAME.pid -O "$LOGFILE" --exec /usr/bin/python3 -- $DIR/app.py
+    fi
     echo "OK"
 }
 
 stop() {
     echo -n "Stopping $NAME: "
     start-stop-daemon -K -q -p /var/run/$NAME.pid
+    sleep 1
     echo "OK"
 }
 
 case "$1" in
     start) start ;;
     stop) stop ;;
-    restart) stop; start ;;
+    restart) stop; sleep 1; start ;;
     *) echo "Usage: $0 {start|stop|restart}"; exit 1 ;;
 esac
