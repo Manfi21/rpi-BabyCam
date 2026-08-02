@@ -2,16 +2,21 @@
 """
 update_os_files.py
 
-Lightweight OTA for the rare case where a newer BabyCamOS release only adds
-a handful of new files (e.g. a new library or GStreamer plugin) rather than
+Lightweight OTA for the case where a newer BabyCamOS release only adds
+a handful of new files (e.g. a new library) rather than
 changing the base build. Downloads the full release image (as published to
 GitHub Releases), mounts its boot/root partitions read-only via loop
-devices, and copies over any files that don't yet exist on this device.
+devices, and copies over files that don't yet exist on this device.
 
-Existing files are NEVER touched - this only adds what's missing, so it
-can't clobber on-device state (wifi config, mediamtx.yml, saved audio
-settings, etc.) or corrupt a binary that's currently running. If nothing
-is missing, nothing happens.
+Existing files are only touched in two cases:
+* managed init scripts (etc/init.d/*) are ALWAYS overwritten, so a new
+  release can ship changes to existing init scripts instead of ignoring them
+* mediamtx.yml is written as a .new file next to the live config so the
+  user can review and merge changes manually
+
+Everything else on the device is left alone, so it can't clobber on-device
+state (wifi config, mediamtx.yml, saved audio settings, etc.) or corrupt a
+binary that's currently running. If nothing is missing, nothing happens.
 
 This is deliberately not a full image flash: writing the whole image over
 the live, mounted root block device while the system runs from it is what
@@ -27,7 +32,6 @@ import sys
 import tarfile
 import tempfile
 import urllib.request
-import difflib
 
 REPO_USER = "Manfi21"
 REPO_NAME = "rpi-BabyCam"
@@ -59,6 +63,12 @@ EXCLUDE_PATHS = {
 MERGE_PATHS = {
     "root/mediamtx.yml",
 }
+
+# Files under these path prefixes are always copied from the release image,
+# overwriting whatever is currently on the device.
+ALWAYS_OVERWRITE_PREFIXES = (
+    "etc/init.d/",
+)
 
 REQUIRED_FREE_MB = 500  # tar.gz + extracted .img, with headroom
 
@@ -191,7 +201,13 @@ def losetup_detach(dev):
 
 
 def sync_missing_files(src_root, dst_root, prefix):
+    """Copies new files and overwrites managed files (init scripts).
+
+    Returns (copied, overwritten): number of files newly added and number of
+    existing files that were replaced.
+    """
     copied = 0
+    overwritten = 0
     for dirpath, _dirnames, filenames in os.walk(src_root):
         rel_dir = os.path.relpath(dirpath, src_root)
         for name in filenames:
@@ -213,28 +229,21 @@ def sync_missing_files(src_root, dst_root, prefix):
 
                     try:
                         compare_and_print_config_changes(dst_file, dst_new)
-                        # with open(dst_file, 'r', errors='replace') as f_old:
-                        #     old_lines = f_old.readlines()
-                        # with open(src_file, 'r', errors='replace') as f_new:
-                        #     new_lines = f_new.readlines()
-                        #
-                        # diff = list(difflib.unified_diff(
-                        #     old_lines,
-                        #     new_lines,
-                        #     fromfile=f"CURRENT: /{exclude_key}",
-                        #     tofile=f"NEW:     /{exclude_key}.new",
-                        #     n=2
-                        # ))
-                        #
-                        # if diff:
-                        #     print(f"    --- Diff for {exclude_key} ---")
-                        #     for line in diff:
-                        #         print(f"    {line.rstrip()}")
-                        #     print(f"    ------------------------------")
-                        # else:
-                        #     print(f"    -> No content changes found.")
                     except Exception as e:
                         print(f"    -> Could not generate diff: {e}")
+
+                    continue
+
+                if any(exclude_key.startswith(p) for p in ALWAYS_OVERWRITE_PREFIXES):
+                    os.makedirs(os.path.dirname(dst_file), exist_ok=True)
+                    if os.path.islink(src_file):
+                        if os.path.lexists(dst_file):
+                            os.unlink(dst_file)
+                        os.symlink(os.readlink(src_file), dst_file)
+                    else:
+                        shutil.copy2(src_file, dst_file)
+                    print(f"  ! /{exclude_key}")
+                    overwritten += 1
 
                 continue
 
@@ -245,7 +254,8 @@ def sync_missing_files(src_root, dst_root, prefix):
                 shutil.copy2(src_file, dst_file)
             print(f"  + /{exclude_key}")
             copied += 1
-    return copied
+    return copied, overwritten
+
 
 
 def update_version_file(new_version):
@@ -346,10 +356,12 @@ def main():
         run(f"mount -t ext4 -o ro {root_dev} {ROOT_MOUNT}")
 
         print("Checking for missing files (boot)...")
-        n_boot = sync_missing_files(BOOT_MOUNT, "/boot", "boot")
+        copied_boot, overwritten_boot = sync_missing_files(BOOT_MOUNT, "/boot", "boot")
         print("Checking for missing files (root)...")
-        n_root = sync_missing_files(ROOT_MOUNT, "/", "")
-        total = n_boot + n_root
+        copied_root, overwritten_root = sync_missing_files(ROOT_MOUNT, "/", "")
+        copied = copied_boot + copied_root
+        overwritten = overwritten_boot + overwritten_root
+        total = copied + overwritten
 
         run(f"umount {BOOT_MOUNT}")
         run(f"umount {ROOT_MOUNT}")
@@ -357,7 +369,7 @@ def main():
         losetup_detach(root_dev)
         boot_dev = root_dev = None
 
-        print(f"Copied {total} new file(s).")
+        print(f"Copied {copied} new file(s), overwritten {overwritten} managed file(s).")
         if total > 0:
             print("Running ldconfig...")
             run("ldconfig", check=False)
