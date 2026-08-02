@@ -802,22 +802,56 @@ def set_tuning_file():
 @app.route('/api/mediamtx/roi', methods=['POST'])
 @basic_auth_required
 def set_roi():
-    """Writes rpiCameraROI directly into mediamtx.yml (persistent)."""
+    """Applies rpiCameraROI live via the MediaMTX API and persists it to mediamtx.yml."""
     data = request.get_json() or {}
     roi = data.get('roi', '').strip()
 
     if roi:
         parts = roi.split(',')
-        if len(parts) != 4 or not all(re.match(r'^-?\d+(\.\d+)?$', p) for p in parts):
+        if len(parts) != 4:
             return jsonify({"status": "error", "message": "ROI must be in format x,y,width,height"}), 400
+        try:
+            x, y, w, h = (float(p) for p in parts)
+        except ValueError:
+            return jsonify({"status": "error", "message": "ROI values must be numbers"}), 400
+
+        if not (0 <= x < 1 and 0 <= y < 1 and 0 < w <= 1 and 0 < h <= 1
+                and x + w <= 1.001 and y + h <= 1.001):
+            return jsonify({
+                "status": "error",
+                "message": "ROI out of range. x,y must be in [0,1), width/height in (0,1] and fit within the frame."
+            }), 400
+        if w < 0.05 or h < 0.05:
+            return jsonify({"status": "error", "message": "ROI too small (min 5% of the frame)."}), 400
+
+    applied_live = False
+    try:
+        resp = requests.patch(
+            f"{MEDIAMTX_API_HOST}/v3/config/paths/patch/cam",
+            json={"rpiCameraROI": roi},
+            timeout=5
+        )
+        applied_live = resp.status_code == 200
+    except requests.exceptions.RequestException:
+        applied_live = False
 
     try:
         write_mediamtx_yaml_key('rpiCameraROI', roi)
-        return jsonify({"status": "success", "message": "Crop saved to mediamtx.yml."})
     except (FileNotFoundError, KeyError) as e:
         return jsonify({"status": "error", "message": str(e)}), 404
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+    if applied_live:
+        message = "Crop applied live and saved to mediamtx.yml."
+    else:
+        message = "Crop saved to mediamtx.yml. Camera server is being restarted to apply it."
+        try:
+            subprocess.Popen(["/etc/init.d/S99start_mediamtx", "restart"])
+        except Exception as e:
+            print(f"[ERROR] Failed to restart camera server: {str(e)}")
+
+    return jsonify({"status": "success", "message": message})
 
 # -----------------------
 # HTML-Sites

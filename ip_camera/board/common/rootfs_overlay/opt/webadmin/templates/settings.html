@@ -301,18 +301,23 @@
         </div>
     </div>
     <div id="cropModal" class="modal-overlay">
-        <div class="modal-content" style="max-width: 720px; width: 90%;">
-            <h3>Adjust Camera Crop</h3>
+        <div class="modal-content" style="max-width: 760px; width: 92%;">
+            <h3>Adjust Camera Zoom / Crop</h3>
             <p style="font-size: 0.85em; color: var(--text-dim); margin-top: -8px;">
-                Drag a rectangle on the live image to select the visible area.
+                Zoom with the mouse wheel / pinch, drag to pan, double-click to zoom in.
             </p>
             <div id="cropStage" class="crop-stage">
                 <iframe id="cropFrame" class="crop-frame" allow="autoplay"></iframe>
-                <div id="cropOverlay" class="crop-overlay"></div>
-                <div id="cropSelection" class="crop-selection"></div>
+            </div>
+            <div class="crop-toolbar">
+                <button class="btn-ghost" onclick="cropZoom(false)">−</button>
+                <span id="cropZoomLabel" class="crop-zoom-label">1.0×</span>
+                <button class="btn-ghost" onclick="cropZoom(true)">+</button>
+                <span id="cropSizeLabel" class="crop-zoom-label crop-size-label"></span>
+                <button class="btn-ghost" onclick="resetCropView()">Reset</button>
             </div>
             <div class="modal-buttons">
-                <button class="btn-green" onclick="applyCropSelection()">Apply Crop</button>
+                <button class="btn-green" onclick="applyCropSelection()">Apply &amp; Save</button>
                 <button class="btn-ghost" onclick="resetCropSelection()">Reset to Full Frame</button>
                 <button class="btn-red" onclick="closeCropSelector()">Cancel</button>
             </div>

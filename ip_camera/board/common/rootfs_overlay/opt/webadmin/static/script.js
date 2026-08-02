@@ -132,18 +132,25 @@ async function saveTuningFile() {
 document.addEventListener('DOMContentLoaded', loadTuningFiles);
 
 // -----------------------
-// Camera Crop (ROI) selector
+// Camera Zoom / Crop (pan & zoom ROI selector)
 // -----------------------
+const CROP_MAX_ZOOM = 8;
+const CROP_ZOOM_STEP = 1.4;
+
 const cropState = {
     width: 1920,
     height: 1080,
-    currentRoi: [0, 0, 1, 1], // x, y, w, h of the currently VISIBLE frame, relative to the full sensor
-    dragging: false,
-    startX: 0,
-    startY: 0,
+    roi: [0, 0, 1, 1],  // currently applied ROI (normalized to the full frame)
+    scale: 1,           // 1 = current stream view fills the stage
+    tx: 0,              // iframe translate X (px)
+    ty: 0,              // iframe translate Y (px)
     stageW: 0,
     stageH: 0,
-    rect: null // {x, y, w, h} normalized to the currently visible frame (0-1)
+    panning: false,
+    panStartX: 0,
+    panStartY: 0,
+    panStartTx: 0,
+    panStartTy: 0
 };
 
 function parseRoi(str) {
@@ -153,128 +160,192 @@ function parseRoi(str) {
     return parts;
 }
 
+function applyCropTransform() {
+    const frame = document.getElementById('cropFrame');
+    if (!frame) return;
+    frame.style.transform = `translate(${cropState.tx}px, ${cropState.ty}px) scale(${cropState.scale})`;
+}
+
+// Visible box inside the current stream frame (normalized), for the given scale + translate
+function visibleView() {
+    const s = cropState.scale;
+    const W = cropState.stageW, H = cropState.stageH;
+    return {
+        x: -cropState.tx / (s * W),
+        y: -cropState.ty / (s * H),
+        w: 1 / s,
+        h: 1 / s
+    };
+}
+
+function clampPan() {
+    const v = visibleView();
+    const maxX = 1 - v.w;
+    const maxY = 1 - v.h;
+    const x = Math.max(0, Math.min(v.x, maxX));
+    const y = Math.max(0, Math.min(v.y, maxY));
+    if (x !== v.x) cropState.tx = -x * cropState.scale * cropState.stageW;
+    if (y !== v.y) cropState.ty = -y * cropState.scale * cropState.stageH;
+}
+
+function updateCropReadout() {
+    const zoomEl = document.getElementById('cropZoomLabel');
+    const sizeEl = document.getElementById('cropSizeLabel');
+    if (!zoomEl) return;
+    const v = visibleView();
+    zoomEl.textContent = cropState.scale.toFixed(1) + '×';
+    if (sizeEl) {
+        sizeEl.textContent = `${Math.round(v.w * cropState.width)} × ${Math.round(v.h * cropState.height)} px`;
+    }
+}
+
+function updateCrop() {
+    clampPan();
+    applyCropTransform();
+    updateCropReadout();
+}
+
+// Zoom around a stage point (cx, cy). factor > 1 zooms in, factor < 1 zooms out.
+function cropZoomAt(cx, cy, factor) {
+    const oldScale = cropState.scale;
+    const newScale = Math.max(1, Math.min(CROP_MAX_ZOOM, oldScale * factor));
+    if (newScale === oldScale) return;
+
+    // content point currently under the cursor
+    const px = (cx - cropState.tx) / (oldScale * cropState.stageW);
+    const py = (cy - cropState.ty) / (oldScale * cropState.stageH);
+
+    cropState.scale = newScale;
+    cropState.tx = cx - px * newScale * cropState.stageW;
+    cropState.ty = cy - py * newScale * cropState.stageH;
+    updateCrop();
+}
+
+function cropZoom(zoomIn) {
+    const stage = document.getElementById('cropStage');
+    const r = stage.getBoundingClientRect();
+    cropZoomAt(r.width / 2, r.height / 2, zoomIn ? CROP_ZOOM_STEP : 1 / CROP_ZOOM_STEP);
+}
+
+function resetCropView() {
+    cropState.scale = 1;
+    cropState.tx = 0;
+    cropState.ty = 0;
+    updateCrop();
+}
+
 function openCropSelector() {
     const btn = document.getElementById('openCropBtn');
+    const stage = document.getElementById('cropStage');
     cropState.width = parseInt(btn.dataset.width, 10) || 1920;
     cropState.height = parseInt(btn.dataset.height, 10) || 1080;
-    cropState.currentRoi = parseRoi(btn.dataset.currentRoi);
-    cropState.rect = null;
+    cropState.roi = parseRoi(btn.dataset.currentRoi);
+    cropState.scale = 1;
+    cropState.tx = 0;
+    cropState.ty = 0;
 
-    document.getElementById('cropStage').style.aspectRatio = `${cropState.width} / ${cropState.height}`;
+    stage.style.aspectRatio = `${cropState.width} / ${cropState.height}`;
+    document.getElementById('cropModal').style.display = 'flex';
 
-    const sel = document.getElementById('cropSelection');
-    sel.style.display = 'none';
+    const rect = stage.getBoundingClientRect();
+    cropState.stageW = rect.width;
+    cropState.stageH = rect.height;
+
+    applyCropTransform();
+    updateCropReadout();
 
     const host = window.location.hostname;
     const protocol = window.location.protocol;
     const postfix = btn.dataset.postfix || '/cam';
     document.getElementById('cropFrame').src = `${protocol}//${host}:8889${postfix}?muted=1`;
-
-    document.getElementById('cropModal').style.display = 'flex';
 }
 
 function closeCropSelector() {
     document.getElementById('cropModal').style.display = 'none';
-    document.getElementById('cropFrame').src = '';
+    const frame = document.getElementById('cropFrame');
+    frame.src = '';
+    frame.style.transform = '';
 }
 
-function cropPointerPos(e, overlay) {
-    const rect = overlay.getBoundingClientRect();
+function cropStagePos(e) {
+    const rect = document.getElementById('cropStage').getBoundingClientRect();
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    return {
-        x: Math.min(Math.max(clientX - rect.left, 0), rect.width),
-        y: Math.min(Math.max(clientY - rect.top, 0), rect.height),
-        w: rect.width,
-        h: rect.height
-    };
+    return {x: clientX - rect.left, y: clientY - rect.top};
 }
 
-function setupCropOverlayEvents() {
-    const overlay = document.getElementById('cropOverlay');
-    const sel = document.getElementById('cropSelection');
-    if (!overlay || !sel) return;
+function setupCropEvents() {
+    const stage = document.getElementById('cropStage');
+    if (!stage) return;
+
+    // Wheel zoom (non-passive so we can preventDefault the page scroll)
+    stage.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const pos = cropStagePos(e);
+        cropZoomAt(pos.x, pos.y, e.deltaY < 0 ? CROP_ZOOM_STEP : 1 / CROP_ZOOM_STEP);
+    }, {passive: false});
+
+    stage.addEventListener('dblclick', (e) => {
+        const pos = cropStagePos(e);
+        cropZoomAt(pos.x, pos.y, CROP_ZOOM_STEP);
+    });
 
     function start(e) {
-        const p = cropPointerPos(e, overlay);
-        cropState.dragging = true;
-        cropState.startX = p.x;
-        cropState.startY = p.y;
-        cropState.stageW = p.w;
-        cropState.stageH = p.h;
-        sel.style.left = p.x + 'px';
-        sel.style.top = p.y + 'px';
-        sel.style.width = '0px';
-        sel.style.height = '0px';
-        sel.style.display = 'block';
+        if (cropState.scale <= 1) return;
+        cropState.panning = true;
+        const pos = cropStagePos(e);
+        cropState.panStartX = pos.x;
+        cropState.panStartY = pos.y;
+        cropState.panStartTx = cropState.tx;
+        cropState.panStartTy = cropState.ty;
+        stage.style.cursor = 'grabbing';
         e.preventDefault();
     }
-
     function move(e) {
-        if (!cropState.dragging) return;
-        const p = cropPointerPos(e, overlay);
-        const left = Math.min(p.x, cropState.startX);
-        const top = Math.min(p.y, cropState.startY);
-        const width = Math.abs(p.x - cropState.startX);
-        const height = Math.abs(p.y - cropState.startY);
-        sel.style.left = left + 'px';
-        sel.style.top = top + 'px';
-        sel.style.width = width + 'px';
-        sel.style.height = height + 'px';
+        if (!cropState.panning) return;
+        const pos = cropStagePos(e);
+        cropState.tx = cropState.panStartTx + (pos.x - cropState.panStartX);
+        cropState.ty = cropState.panStartTy + (pos.y - cropState.panStartY);
+        updateCrop();
         e.preventDefault();
     }
-
     function end() {
-        if (!cropState.dragging) return;
-        cropState.dragging = false;
-        const w = parseFloat(sel.style.width);
-        const h = parseFloat(sel.style.height);
-        if (w < 10 || h < 10) {
-            sel.style.display = 'none';
-            cropState.rect = null;
-            return;
-        }
-        cropState.rect = {
-            x: parseFloat(sel.style.left) / cropState.stageW,
-            y: parseFloat(sel.style.top) / cropState.stageH,
-            w: w / cropState.stageW,
-            h: h / cropState.stageH
-        };
+        if (!cropState.panning) return;
+        cropState.panning = false;
+        stage.style.cursor = '';
     }
 
-    overlay.addEventListener('mousedown', start);
-    overlay.addEventListener('mousemove', move);
-    overlay.addEventListener('mouseup', end);
-    overlay.addEventListener('touchstart', start, {passive: false});
-    overlay.addEventListener('touchmove', move, {passive: false});
-    overlay.addEventListener('touchend', end);
+    stage.addEventListener('mousedown', start);
+    stage.addEventListener('mousemove', move);
+    stage.addEventListener('mouseup', end);
+    stage.addEventListener('mouseleave', end);
+    stage.addEventListener('touchstart', start, {passive: false});
+    stage.addEventListener('touchmove', move, {passive: false});
+    stage.addEventListener('touchend', end);
 }
 
-document.addEventListener('DOMContentLoaded', setupCropOverlayEvents);
-
-function composeRoi(base, sel) {
-    const [ox, oy, ow, oh] = base;
-    const nx = ox + sel.x * ow;
-    const ny = oy + sel.y * oh;
-    const nw = sel.w * ow;
-    const nh = sel.h * oh;
-    return [nx, ny, nw, nh].map(v => Math.max(0, Math.min(1, v)));
-}
+document.addEventListener('DOMContentLoaded', setupCropEvents);
 
 function applyCropSelection() {
-    if (!cropState.rect) {
-        showMessage('Please drag a selection on the image first.', true);
+    if (cropState.scale <= 1) {
+        showMessage('Zoom in first, then press Apply & Save.', true);
         return;
     }
-    const [x, y, w, h] = composeRoi(cropState.currentRoi, cropState.rect).map(v => v.toFixed(4));
-    const roiString = `${x},${y},${w},${h}`;
+    const v = visibleView();
+    const [rx, ry, rw, rh] = cropState.roi;
+    const x = rx + v.x * rw;
+    const y = ry + v.y * rh;
+    const w = v.w * rw;
+    const h = v.h * rh;
+    const roiString = [x, y, w, h].map(v => v.toFixed(4)).join(',');
+
     closeCropSelector();
-    submitRoi(roiString, `Apply crop ${roiString}? This writes mediamtx.yml and restarts the camera server.`);
+    submitRoi(roiString, `Apply zoom ${roiString}? The crop is applied live, no restart needed.`);
 }
 
 function resetCropSelection() {
     closeCropSelector();
-    submitRoi('', 'Reset crop to full frame? This writes mediamtx.yml and restarts the camera server.');
+    submitRoi('', 'Reset crop to full frame?');
 }
 
 function submitRoi(roiString, confirmMsg) {
@@ -287,12 +358,11 @@ function submitRoi(roiString, confirmMsg) {
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({roi: roiString})
             });
-
+            const result = await response.json();
             if (response.ok) {
-                setTimeout(() => sys_stream('restart_cameraserver'), 500);
+                showMessage(result.message || 'Crop saved.');
             } else {
-                const result = await response.json();
-                showMessage('Error: ' + result.message, true);
+                showMessage('Error: ' + (result.message || 'Unknown error'), true);
             }
         } catch (e) {
             showMessage('Network error while saving.', true);

@@ -373,13 +373,17 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: none; }
 .modal-buttons { display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap; }
 .modal-buttons button { margin: 0; flex: 1; }
 
-/* --- Crop / ROI selector --- */
+/* --- Crop / ROI selector (pan & zoom) --- */
 .crop-stage {
     position: relative;
     width: 100%;
     background: #000;
     overflow: hidden;
     border-radius: var(--radius-sm);
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    cursor: grab;
 }
 .crop-frame {
     width: 100%;
@@ -387,18 +391,31 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: none; }
     border: none;
     pointer-events: none;
     display: block;
+    transform-origin: 0 0;
+    will-change: transform;
 }
-.crop-overlay {
-    position: absolute;
-    inset: 0;
-    cursor: crosshair;
+.crop-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
 }
-.crop-selection {
-    position: absolute;
-    border: 2px solid var(--accent);
-    background: rgba(79, 140, 255, 0.2);
-    pointer-events: none;
-    display: none;
+.crop-toolbar .btn-ghost {
+    flex: 0 0 auto;
+}
+.crop-zoom-label {
+    min-width: 44px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.9em;
+    color: var(--text);
+}
+.crop-size-label {
+    min-width: 0;
+    color: var(--text-dim);
+    flex: 1;
+    text-align: right;
+    font-size: 0.82em;
 }
 
 @media (max-width: 480px) {
