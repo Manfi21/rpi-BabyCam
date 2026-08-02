@@ -11,6 +11,23 @@ TMP_TAR="/tmp/webadmin_update.tar.gz"
 INIT_SCRIPT="/etc/init.d/S99webadmin"
 VERSION_FILE="/etc/babycam-version"
 
+# Returns 0 if $1 >= $2 (dotted numeric versions, optional leading 'v').
+version_ge() {
+    awk -v a="$1" -v b="$2" '
+        function score(v,   n, p, i, q, s) {
+            gsub(/^[vV]/, "", v)
+            n = split(v, p, ".")
+            for (i = 1; i <= 3; i++) {
+                q = p[i]
+                sub(/[^0-9].*$/, "", q)
+                q = (q == "" ? 0 : q + 0)
+                s = s * 1000 + q
+            }
+            return s
+        }
+        BEGIN { exit (score(a) < score(b)) }'
+}
+
 # -----------------------------
 # 1. Backup
 # -----------------------------
@@ -28,6 +45,16 @@ if [ -z "$LATEST_TAG" ]; then
 fi
 
 echo "Latest version is: $LATEST_TAG"
+
+INSTALLED_VERSION=$(sed -n 's/^WEBSERVER_VERSION=\(.*\)/\1/p' "$VERSION_FILE")
+if [ -z "$INSTALLED_VERSION" ]; then
+    INSTALLED_VERSION=$(sed -n 's/^VERSION=\(.*\)/\1/p' "$VERSION_FILE")
+fi
+if [ -n "$INSTALLED_VERSION" ] && version_ge "$INSTALLED_VERSION" "$LATEST_TAG"; then
+    echo "Already up to date (installed $INSTALLED_VERSION, latest $LATEST_TAG). No update needed."
+    exit 0
+fi
+
 NEW_LINE="WEBSERVER_VERSION=$LATEST_TAG"
 if grep -q "^WEBSERVER_VERSION=" "$VERSION_FILE"; then
     echo "Updating existing version line..."

@@ -257,6 +257,28 @@ def sync_missing_files(src_root, dst_root, prefix):
     return copied, overwritten
 
 
+def parse_version(version):
+    """'v0.5.1' (or '0.5.1-5-g...') -> (0, 5, 1) for numeric comparison."""
+    s = str(version).strip().lstrip("vV")
+    parts = []
+    for p in s.split(".")[:3]:
+        digits = re.sub(r"[^0-9].*$", "", p)
+        parts.append(int(digits) if digits else 0)
+    while len(parts) < 3:
+        parts.append(0)
+    return tuple(parts)
+
+def get_installed_version():
+    if not os.path.exists(VERSION_FILE):
+        return None
+    try:
+        with open(VERSION_FILE) as f:
+            for line in f:
+                if line.startswith("VERSION="):
+                    return line.strip().split("=", 1)[1]
+    except Exception:
+        pass
+    return None
 
 def update_version_file(new_version):
     if not os.path.exists(VERSION_FILE):
@@ -328,6 +350,12 @@ def main():
 
     suffix = detect_board_suffix()
     tag, asset_url = fetch_release_asset(suffix)
+
+    installed = get_installed_version()
+    if installed and parse_version(tag) <= parse_version(installed):
+        print(f"Already up to date (installed {installed}, latest {tag}). No update needed.")
+        print("--- DONE ---")
+        return
 
     tmp_dir = tempfile.mkdtemp(prefix="ota_", dir="/opt")
     boot_dev = root_dev = None
