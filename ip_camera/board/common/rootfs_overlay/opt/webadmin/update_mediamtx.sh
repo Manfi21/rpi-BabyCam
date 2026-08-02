@@ -20,12 +20,10 @@ VERSION_FILE="/etc/babycam-version"
 # -----------------------------
 # 1. Determine latest version
 # -----------------------------
-tailscale down
 echo "Fetching latest mediamtx version info..."
 LATEST_TAG=$(wget -qO- --header="User-Agent: Mozilla/5.0" "$API_URL" | grep -m 1 '"tag_name":' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')
 if [ -z "$LATEST_TAG" ]; then
     echo "Error: Could not retrieve latest tag."
-    tailscale up
     exit 1
 fi
 echo "Latest version is: $LATEST_TAG"
@@ -40,7 +38,6 @@ echo "Downloading $DOWNLOAD_URL ..."
 wget -qO "$TMP_TAR" "$DOWNLOAD_URL" || {
     echo "Download failed!"
     rm -f "$TMP_TAR"
-    tailscale up
     exit 1
 }
 
@@ -50,7 +47,6 @@ mkdir -p "$TMP_EXTRACT"
 tar -xzf "$TMP_TAR" -C "$TMP_EXTRACT" mediamtx || {
     echo "Extract failed!"
     rm -rf "$TMP_EXTRACT" "$TMP_TAR"
-    tailscale up
     exit 1
 }
 
@@ -63,7 +59,6 @@ echo "Stopping mediamtx..."
 echo "Backing up current binary to $BACKUP_PATH ..."
 cp "$BIN_PATH" "$BACKUP_PATH" || {
     echo "Backup failed!"
-    tailscale up
     exit 1
 }
 
@@ -87,5 +82,4 @@ echo "Starting mediamtx..."
 "$INIT_SCRIPT" start
 
 echo "Update to $LATEST_TAG finished."
-tailscale up
 exit 0

@@ -4,7 +4,6 @@ from functools import wraps
 import subprocess
 import os
 import requests
-import json
 import time
 import hashlib
 import base64
@@ -12,6 +11,7 @@ import shutil
 import socket
 import re
 import shlex
+import tempfile
 from update_os_files import compare_and_print_config_changes
 
 app = Flask(__name__)
@@ -48,6 +48,14 @@ def run_command(command, timeout=5):
         return "CMD timeout"
     except Exception as e:
         return str(e)
+
+def atomic_write(filepath, data):
+    dir_name = os.path.dirname(os.path.abspath(filepath)) or '.'
+    temp_fd, temp_path = tempfile.mkstemp(dir=dir_name, prefix='.tmp_')
+    mode = 'w' if isinstance(data, str) else 'wb'
+    with os.fdopen(temp_fd, mode) as f:
+        f.write(data)
+    os.replace(temp_path, filepath)
 
 def hash_credential(cred: str) -> str:
     h = hashlib.sha256(cred.encode("utf-8")).digest()
@@ -140,10 +148,9 @@ def get_hostname():
         return "unknown"
 
 def apply_hostname(new_hostname):
-    with open(HOSTNAME_FILE, 'w') as f:
-        f.write(new_hostname + "\n")
+    atomic_write(HOSTNAME_FILE, new_hostname + "\n")
 
-    run_command(f"hostname {new_hostname}")
+    run_command(f"hostname {shlex.quote(new_hostname)}")
 
     # avahi only re-announces its mDNS record on process start, not on
     # "reload" (that just re-reads static service files) - so it needs a
@@ -258,8 +265,7 @@ def apply_audio_mute(control, muted):
 
 def save_audio_config(control, percent, muted):
     try:
-        with open(AUDIO_CONFIG_PATH, 'w') as f:
-            json.dump({'control': control, 'percent': percent, 'muted': muted}, f)
+        atomic_write(AUDIO_CONFIG_PATH, json.dumps({'control': control, 'percent': percent, 'muted': muted}))
     except Exception as e:
         print(f"[ERROR] Could not save audio config: {e}")
 
@@ -429,6 +435,7 @@ def scan_wifi():
     return jsonify({'networks': networks})
 
 @app.route('/api/wifi', methods=['POST'])
+@basic_auth_required
 def connect_wifi():
     data = request.json or {}
     ssid = data.get('ssid')
@@ -439,7 +446,7 @@ def connect_wifi():
 
     try:
         print(f"[WIFI] Started add_wifi.sh for SSID: {ssid}")
-        os.system(f"/opt/webadmin/add_wifi.sh {ssid} {password} &")
+        subprocess.Popen(["/opt/webadmin/add_wifi.sh", ssid, password])
 
         return jsonify({
             'status': 'success',
@@ -451,6 +458,7 @@ def connect_wifi():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/hostname', methods=['POST'])
+@basic_auth_required
 def set_hostname():
     data = request.json or {}
     new_hostname = data.get('hostname', '').strip()
@@ -472,6 +480,7 @@ def set_hostname():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/system', methods=['POST'])
+@basic_auth_required
 def system_control():
     action = (request.json or {}).get('action', '')
     if action == 'reboot':
@@ -499,7 +508,7 @@ def system_stream():
         "update_mediamtx": "/opt/webadmin/update_mediamtx.sh",
         "update_webserver": "/opt/webadmin/update_webserver.sh",
         "sync_os_files": "python3 -u /opt/webadmin/update_os_files.py",
-        "setup_tailscale": "tailscale up",
+        "setup_tailscale": "tailscale up --accept-dns=false",
         "restart_cameraserver": "/etc/init.d/S99start_mediamtx restart",
         "restart_webserver": "/etc/init.d/S99webadmin restart"
     }
@@ -744,10 +753,10 @@ def save_config_file():
     content = data.get('content')
     try:
         # Sicherheits-Backup erstellen
-        os.system(f'cp {MEDIAMTX_CONFIG_PATH} {MEDIAMTX_CONFIG_PATH}.bak')
+        if os.path.exists(MEDIAMTX_CONFIG_PATH):
+            shutil.copyfile(MEDIAMTX_CONFIG_PATH, f"{MEDIAMTX_CONFIG_PATH}.bak")
 
-        with open(MEDIAMTX_CONFIG_PATH, 'w') as f:
-            f.write(content)
+        atomic_write(MEDIAMTX_CONFIG_PATH, content)
         return jsonify({"status": "success", "message": "Gespeichert!"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -821,8 +830,7 @@ def settings_page():
             new_postfix = '/' + new_postfix
 
         try:
-            with open(CONFIG_FILE_PATH, 'w') as f:
-                f.write(new_postfix + "\n")
+            atomic_write(CONFIG_FILE_PATH, new_postfix + "\n")
         except Exception as e:
             print("Error saving:", e)
             return f"Error saving: {e}", 500

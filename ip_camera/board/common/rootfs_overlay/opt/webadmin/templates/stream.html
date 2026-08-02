@@ -59,8 +59,9 @@
     <iframe id="streamFrame" allow="autoplay; fullscreen"></iframe>
     <script>
         const host = window.location.hostname;
+        const protocol = window.location.protocol;
         let postfix = localStorage.getItem('stream_postfix') || "{{ stream_postfix or '/cam' }}";
-        document.getElementById('streamFrame').src = "http://" + host + ":8889" + postfix + "?muted=0";
+        document.getElementById('streamFrame').src = `${protocol}//${host}:8889${postfix}?muted=0`;
     </script>
 </body>
 </html>

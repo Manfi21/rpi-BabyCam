@@ -37,8 +37,8 @@ if [ "$USER" = "any" ]; then
     ' "$CONFIG" > "$CONFIG.tmp" && mv "$CONFIG.tmp" "$CONFIG"
 else
     # Hashen
-    USER_HASH=$(echo -n "$USER" | openssl dgst -binary -sha256 | openssl base64)
-    PASS_HASH=$(echo -n "$PASS" | openssl dgst -binary -sha256 | openssl base64)
+    USER_HASH=$(printf '%s' "$USER" | openssl dgst -binary -sha256 | openssl base64)
+    PASS_HASH=$(printf '%s' "$PASS" | openssl dgst -binary -sha256 | openssl base64)
 
     awk -v new_user="$USER_HASH" -v new_pass="$PASS_HASH" '
     BEGIN {replaced=0; inside=0}

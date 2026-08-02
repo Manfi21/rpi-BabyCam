@@ -316,8 +316,6 @@ def compare_and_print_config_changes(old_file, new_file):
 def main():
     check_free_space("/")
 
-    run_command("tailscale down")
-
     suffix = detect_board_suffix()
     tag, asset_url = fetch_release_asset(suffix)
 
@@ -382,8 +380,6 @@ def main():
             subprocess.run(f"umount {BOOT_MOUNT}", shell=True, capture_output=True)
             losetup_detach(boot_dev)
         shutil.rmtree(tmp_dir, ignore_errors=True)
-
-    run_command("tailscale up")
 
 
 if __name__ == "__main__":

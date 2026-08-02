@@ -166,8 +166,9 @@ function openCropSelector() {
     sel.style.display = 'none';
 
     const host = window.location.hostname;
+    const protocol = window.location.protocol;
     const postfix = btn.dataset.postfix || '/cam';
-    document.getElementById('cropFrame').src = `http://${host}:8889${postfix}?muted=1`;
+    document.getElementById('cropFrame').src = `${protocol}//${host}:8889${postfix}?muted=1`;
 
     document.getElementById('cropModal').style.display = 'flex';
 }

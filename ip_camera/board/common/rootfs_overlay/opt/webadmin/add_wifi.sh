@@ -42,8 +42,10 @@ if [ "$ID" = "FAIL" ] || [ -z "$ID" ]; then
 fi
 
 echo "[WIFI] Configuring network ID: $ID"
-wpa_cli -i $WLAN_IF set_network $ID ssid "\"$NEW_SSID\""
-wpa_cli -i $WLAN_IF set_network $ID psk "\"$NEW_PASS\""
+SAFE_SSID=$(printf '%s' "$NEW_SSID" | sed 's/"/\\"/g')
+SAFE_PASS=$(printf '%s' "$NEW_PASS" | sed 's/"/\\"/g')
+wpa_cli -i $WLAN_IF set_network $ID ssid "\"$SAFE_SSID\""
+wpa_cli -i $WLAN_IF set_network $ID psk "\"$SAFE_PASS\""
 wpa_cli -i $WLAN_IF set_network $ID key_mgmt WPA-PSK
 wpa_cli -i $WLAN_IF enable_network $ID
 
