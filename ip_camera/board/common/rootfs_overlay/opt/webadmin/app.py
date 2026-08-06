@@ -646,6 +646,15 @@ def system_stats():
         'uptime_seconds': get_uptime_seconds()
     })
 
+@app.route('/api/network', methods=['GET'])
+def network_info():
+    return jsonify({
+        'hostname': get_hostname(),
+        'ip': get_ip_address(),
+        'ip_tailscale': get_ip_tailscale_address(),
+        'ssid': get_current_ssid()
+    })
+
 @app.route('/api/logs/stream', methods=['GET'])
 @basic_auth_required
 def logs_stream():
