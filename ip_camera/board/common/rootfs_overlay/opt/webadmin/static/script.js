@@ -768,6 +768,102 @@ async function loadVersionInfo() {
 
 document.addEventListener('DOMContentLoaded', loadVersionInfo);
 
+// -----------------------
+// BabyCam View native app (download field)
+// -----------------------
+function isNativeApp() {
+    return /Electron/i.test(navigator.userAgent);
+}
+
+function bcvPlatform() {
+    const ua = navigator.userAgent;
+    if (/Android/i.test(ua)) return 'android';
+    if (/iPhone|iPad|iPod|Mac/i.test(ua)) return 'apple';
+    if (/Windows/i.test(ua)) return 'windows';
+    return 'linux';
+}
+
+function detectClient() {
+    if (isNativeApp()) return 'BabyCam View app';
+    return 'Browser';
+}
+
+function getInstalledAppVersion() {
+    const m = navigator.userAgent.match(/(?:babycam|babicam)[^\s/]*\/(\d+\.\d+(?:\.\d+)?)/i);
+    return m ? m[1] : null;
+}
+
+function semverGt(a, b) {
+    const pa = String(a).split('.').map(n => parseInt(n, 10) || 0);
+    const pb = String(b).split('.').map(n => parseInt(n, 10) || 0);
+    for (let i = 0; i < 3; i++) {
+        if ((pa[i] || 0) > (pb[i] || 0)) return true;
+        if ((pa[i] || 0) < (pb[i] || 0)) return false;
+    }
+    return false;
+}
+
+async function updateNativeAppButton() {
+    const btn = document.getElementById('getNativeAppBtn');
+    if (!btn) return;
+    try {
+        const res = await fetch('/api/babycamview');
+        const data = await res.json();
+        if (data.status !== 'ok') return;
+
+        const installed = getInstalledAppVersion();
+        if (isNativeApp()) {
+            if (installed && semverGt(data.version, installed)) {
+                btn.textContent = 'Update App (' + data.tag + ')';
+                btn.classList.add('btn-update-avail');
+            } else {
+                btn.textContent = 'App up to date (' + data.tag + ')';
+            }
+        } else {
+            btn.textContent = 'Get Native App (' + data.tag + ')';
+        }
+    } catch (e) { /* keep default button text */ }
+}
+
+async function getNativeApp() {
+    try {
+        const res = await fetch('/api/babycamview');
+        const data = await res.json();
+        if (data.status !== 'ok') {
+            showMessage('Could not fetch app info: ' + (data.error || 'unknown'), true);
+            return;
+        }
+        const platform = bcvPlatform();
+        const url = (data.assets && data.assets[platform]) || data.releases_url;
+
+        if (isNativeApp()) {
+            showMessage(
+                'BabyCam View ' + data.tag + ' — download it from the <a href="' + data.releases_url +
+                '" rel="noopener" style="color: var(--accent);">GitHub releases page</a>.',
+                false
+            );
+            return;
+        }
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.rel = 'noopener';
+        a.download = url.split('/').pop();
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        showMessage('Downloading BabyCam View ' + data.tag + ' for ' + platform + '.');
+    } catch (e) {
+        showMessage('Network error: ' + e.message, true);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const clientEl = document.getElementById('clientType');
+    if (clientEl) clientEl.textContent = detectClient();
+    updateNativeAppButton();
+});
+
 async function openEditor() {
     try {
         const response = await fetch('/api/get_config_file');

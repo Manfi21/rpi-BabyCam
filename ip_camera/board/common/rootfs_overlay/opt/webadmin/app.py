@@ -31,6 +31,11 @@ LOG_SOURCES = {
     'mediamtx': '/var/log/mediamtx.log',
 }
 
+BABYCAMVIEW_REPO = "Manfi21/Babycam-View"
+BABYCAMVIEW_RELEASES_URL = f"https://github.com/{BABYCAMVIEW_REPO}/releases/latest"
+BABYCAMVIEW_CACHE_TTL = 900  # seconds (15 min)
+_babycamview_cache = {'data': None, 'fetched_at': 0.0}
+
 _last_cpu_sample = {'total': None, 'idle': None}
 
 # -----------------------
@@ -548,6 +553,25 @@ def system_stream():
 
         return Response(generate_diff(), mimetype='text/event-stream')
 
+    if action == "get_native_app":
+        def generate_app_info():
+            info = fetch_babycamview_release(force=True)
+            if info.get('status') == 'ok':
+                yield f"data: BabyCam View native app\n\n"
+                yield f"data: Latest version: {info['tag']}\n\n"
+                published = (info.get('published_at') or '')[:10]
+                if published:
+                    yield f"data: Released: {published}\n\n"
+                for label, key in (('Android', 'android'), ('Linux', 'linux'), ('Windows', 'windows')):
+                    url = (info.get('assets') or {}).get(key)
+                    if url:
+                        yield f"data: {label}: {url}\n\n"
+                yield f"data: All releases: {info.get('releases_url')}\n\n"
+            else:
+                yield f"data: {info.get('error', 'Unknown error')}\n\n"
+            yield "data: --- DONE ---\n\n"
+        return Response(generate_app_info(), mimetype='text/event-stream')
+
     if action not in commands:
         return "event: message\ndata: Unknown action\n\n", 400
 
@@ -645,6 +669,67 @@ def system_stats():
         },
         'uptime_seconds': get_uptime_seconds()
     })
+
+# -----------------------
+# BabyCam View native app (GitHub releases)
+# -----------------------
+def fetch_babycamview_release(force=False):
+    """Returns the latest BabyCam View release info with per-platform asset URLs."""
+    cache = _babycamview_cache
+    now = time.time()
+    if not force and cache['data'] is not None and now - cache['fetched_at'] < BABYCAMVIEW_CACHE_TTL:
+        return cache['data']
+
+    def fail(msg):
+        result = {'status': 'error', 'error': msg}
+        if cache['data'] is not None:
+            result['cached'] = cache['data']
+        return result
+
+    try:
+        r = requests.get(
+            f"https://api.github.com/repos/{BABYCAMVIEW_REPO}/releases/latest",
+            timeout=6
+        )
+        if r.status_code == 403:
+            return fail('GitHub API rate limit reached.')
+        r.raise_for_status()
+        release = r.json()
+
+        tag = release.get('tag_name') or ''
+        assets = {'android': None, 'linux': None, 'windows': None}
+        for a in release.get('assets') or []:
+            name = (a.get('name') or '').lower()
+            url = a.get('browser_download_url')
+            if not url:
+                continue
+            if name.endswith('.apk') and not assets['android']:
+                assets['android'] = url
+            elif name.endswith('.appimage') and not assets['linux']:
+                assets['linux'] = url
+            elif name.endswith('.exe') and not assets['windows']:
+                assets['windows'] = url
+
+        data = {
+            'status': 'ok',
+            'tag': tag,
+            'version': tag.lstrip('vV'),
+            'published_at': release.get('published_at'),
+            'releases_url': BABYCAMVIEW_RELEASES_URL,
+            'assets': assets,
+        }
+        cache['data'] = data
+        cache['fetched_at'] = now
+        return data
+    except requests.exceptions.RequestException as e:
+        return fail(f'Could not reach GitHub API: {e}')
+    except Exception as e:
+        return fail(str(e))
+
+@app.route('/api/babycamview', methods=['GET'])
+def babycamview_info():
+    force = request.args.get('refresh') == '1'
+    return jsonify(fetch_babycamview_release(force=force))
 
 @app.route('/api/network', methods=['GET'])
 def network_info():

@@ -57,11 +57,39 @@
             background: rgba(40, 44, 56, 0.75);
             border-color: rgba(255, 255, 255, 0.35);
         }
+        #appBanner {
+            position: fixed;
+            left: 50%;
+            bottom: 18px;
+            transform: translateX(-50%);
+            z-index: 200;
+            display: none;
+            align-items: center;
+            gap: 12px;
+            background: rgba(20, 22, 28, 0.92);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            color: #eee;
+            border-radius: 14px;
+            padding: 12px 16px;
+            max-width: calc(100vw - 32px);
+            font-size: 0.9rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+        #appBanner .banner-dl {
+            background: var(--accent, #4f8cff);
+            color: #fff;
+        }
     </style>
 </head>
 <body>
     <div class="controls">
         <a href="/settings" class="btn">Settings</a>
+    </div>
+    <div id="appBanner">
+        <span id="bannerText">BabyCam View app <b id="bannerVersion"></b> available</span>
+        <a id="bannerDownload" class="btn banner-dl" href="#" target="_blank" rel="noopener">Download</a>
+        <button id="bannerLater" class="btn">Later</button>
     </div>
     <iframe id="streamFrame" allow="autoplay; fullscreen"></iframe>
     <script>
@@ -69,6 +97,53 @@
         const protocol = window.location.protocol;
         let postfix = localStorage.getItem('stream_postfix') || "{{ stream_postfix or '/cam' }}";
         document.getElementById('streamFrame').src = `${protocol}//${host}:8889${postfix}?muted=0`;
+
+        function getInstalledAppVersion() {
+            const m = navigator.userAgent.match(/(?:babycam|babicam)[^\s/]*\/(\d+\.\d+(?:\.\d+)?)/i);
+            return m ? m[1] : null;
+        }
+        function semverGt(a, b) {
+            const pa = String(a).split('.').map(n => parseInt(n, 10) || 0);
+            const pb = String(b).split('.').map(n => parseInt(n, 10) || 0);
+            for (let i = 0; i < 3; i++) {
+                if ((pa[i] || 0) > (pb[i] || 0)) return true;
+                if ((pa[i] || 0) < (pb[i] || 0)) return false;
+            }
+            return false;
+        }
+
+        (function initAppBanner() {
+            fetch('/api/babycamview')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status !== 'ok' || !data.version) return;
+                    if (localStorage.getItem('bcview_banner_dismissed') === data.version) return;
+
+                    const inApp = /Electron/i.test(navigator.userAgent);
+                    const installed = getInstalledAppVersion();
+                    if (inApp && (!installed || !semverGt(data.version, installed))) return;
+
+                    let platform = 'linux';
+                    if (/Android/i.test(navigator.userAgent)) platform = 'android';
+                    else if (/Windows/i.test(navigator.userAgent)) platform = 'windows';
+
+                    const dl = document.getElementById('bannerDownload');
+                    if (inApp) {
+                        document.getElementById('bannerText').textContent =
+                            'BabyCam View update available: ' + data.tag + ' (installed ' + installed + ')';
+                        dl.href = data.releases_url;
+                    } else {
+                        document.getElementById('bannerVersion').textContent = data.tag;
+                        dl.href = (data.assets && data.assets[platform]) || data.releases_url;
+                    }
+                    document.getElementById('appBanner').style.display = 'flex';
+                    document.getElementById('bannerLater').onclick = () => {
+                        localStorage.setItem('bcview_banner_dismissed', data.version);
+                        document.getElementById('appBanner').style.display = 'none';
+                    };
+                })
+                .catch(() => {});
+        })();
     </script>
 </body>
 </html>
