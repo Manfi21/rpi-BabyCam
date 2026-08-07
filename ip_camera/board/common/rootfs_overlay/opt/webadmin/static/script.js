@@ -135,7 +135,7 @@ document.addEventListener('DOMContentLoaded', loadTuningFiles);
 // Camera Zoom / Crop (pan & zoom ROI selector)
 // -----------------------
 const CROP_MAX_ZOOM = 8;
-const CROP_ZOOM_STEP = 1.4;
+const CROP_ZOOM_STEP = 1.1;
 
 const cropState = {
     width: 1920,
