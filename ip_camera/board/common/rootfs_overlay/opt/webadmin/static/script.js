@@ -278,6 +278,21 @@ function setupCropEvents() {
     const stage = document.getElementById('cropStage');
     if (!stage) return;
 
+    let pinchStartDist = 0;
+    let pinchLastDist = 0;
+
+    function pinchDist(touches) {
+        const dx = touches[0].clientX - touches[1].clientX;
+        const dy = touches[0].clientY - touches[1].clientY;
+        return Math.hypot(dx, dy);
+    }
+
+    function pinchMid(touches) {
+        const a = touches[0];
+        const b = touches[1];
+        return { x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2 };
+    }
+
     // Wheel zoom (non-passive so we can preventDefault the page scroll)
     stage.addEventListener('wheel', (e) => {
         e.preventDefault();
@@ -315,13 +330,48 @@ function setupCropEvents() {
         stage.style.cursor = '';
     }
 
+    function touchStart(e) {
+        if (e.touches.length === 2) {
+            pinchStartDist = pinchDist(e.touches);
+            pinchLastDist = pinchStartDist;
+            cropState.panning = false;
+            stage.style.cursor = '';
+            e.preventDefault();
+            return;
+        }
+        start(e);
+    }
+
+    function touchMove(e) {
+        if (e.touches.length === 2) {
+            if (pinchStartDist > 0) {
+                const d = pinchDist(e.touches);
+                const mid = pinchMid(e.touches);
+                cropZoomAt(mid.x, mid.y, d / pinchLastDist);
+                pinchLastDist = d;
+            }
+            e.preventDefault();
+            return;
+        }
+        move(e);
+    }
+
+    function touchEnd(e) {
+        if (e.touches.length < 2) {
+            pinchStartDist = 0;
+            pinchLastDist = 0;
+        }
+        end();
+    }
+
     stage.addEventListener('mousedown', start);
     stage.addEventListener('mousemove', move);
     stage.addEventListener('mouseup', end);
     stage.addEventListener('mouseleave', end);
-    stage.addEventListener('touchstart', start, {passive: false});
-    stage.addEventListener('touchmove', move, {passive: false});
-    stage.addEventListener('touchend', end);
+    stage.addEventListener('touchstart', touchStart, {passive: false});
+    stage.addEventListener('touchmove', touchMove, {passive: false});
+    stage.addEventListener('touchend', touchEnd);
+    stage.addEventListener('touchcancel', touchEnd);
 }
 
 document.addEventListener('DOMContentLoaded', setupCropEvents);
