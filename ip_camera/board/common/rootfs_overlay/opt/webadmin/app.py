@@ -146,6 +146,31 @@ def get_ip_tailscale_address():
     except Exception:
         return "Not connected"
 
+def get_tailscale_status():
+    """Returns connection state of the Tailscale daemon."""
+    try:
+        data = run_command("tailscale status --peers=false --json 2>/dev/null")
+        if data and data not in ("CMD not found", "CMD timeout") and '{' in data:
+            info = json.loads(data)
+            state = info.get('BackendState', 'Unknown')
+            ips = info.get('TailscaleIPs') or []
+            ip = ips[0] if ips else None
+            connected = state == 'Running' and bool(ip)
+            return {
+                'connected': connected,
+                'state': state,
+                'ip': ip if connected else None,
+            }
+    except Exception as e:
+        print(f"[ERROR] Could not parse tailscale status: {str(e)}")
+    ip = get_ip_tailscale_address()
+    connected = ip != "Not connected"
+    return {
+        'connected': connected,
+        'state': 'Running' if connected else 'Stopped',
+        'ip': None if not connected else ip,
+    }
+
 def get_hostname():
     try:
         return socket.gethostname()
@@ -514,6 +539,8 @@ def system_stream():
         "update_webserver": "/opt/webadmin/update_webserver.sh",
         "sync_os_files": "python3 -u /opt/webadmin/update_os_files.py",
         "setup_tailscale": "tailscale up --accept-dns=false",
+        "tailscale_down": "tailscale down",
+        "tailscale_logout": "tailscale logout",
         "restart_cameraserver": "/etc/init.d/S99start_mediamtx restart",
         "restart_webserver": "/etc/init.d/S99webadmin restart"
     }
@@ -667,7 +694,8 @@ def system_stats():
             '5min': round(load5, 2),
             '15min': round(load15, 2)
         },
-        'uptime_seconds': get_uptime_seconds()
+        'uptime_seconds': get_uptime_seconds(),
+        'tailscale': get_tailscale_status()
     })
 
 # -----------------------

@@ -614,6 +614,35 @@ function sys_stream(action) {
     };
 }
 
+// -----------------------
+// Tailscale controls
+// -----------------------
+let tailscaleState = { connected: false, state: 'Unknown', ip: null };
+
+function updateTailscaleUI(ts) {
+    if (ts) tailscaleState = ts;
+
+    const ipEl = document.getElementById('ipTailscale');
+    if (ipEl) ipEl.textContent = tailscaleState.connected ? (tailscaleState.ip || 'Not connected') : 'Not connected';
+
+    const toggleBtn = document.getElementById('tailscaleToggleBtn');
+    if (toggleBtn) {
+        toggleBtn.textContent = tailscaleState.connected ? 'Tailscale down' : 'Setup Tailscale';
+        toggleBtn.className = tailscaleState.connected ? 'btn-red' : 'btn-blue';
+    }
+}
+
+function toggleTailscale() {
+    sys_stream(tailscaleState.connected ? 'tailscale_down' : 'setup_tailscale');
+}
+
+function tailscaleReauth() {
+    if (!confirm('Tailscale wird komplett zurückgesetzt (logout). Danach muss die Node neu authentifiziert werden (Setup Tailscale zeigt den Login-Link). Fortfahren?')) {
+        return;
+    }
+    sys_stream('tailscale_logout');
+}
+
 window.onload = function() {
     localStorage.removeItem('stream_postfix');
 }
@@ -1028,6 +1057,8 @@ async function refreshSystemStats() {
         document.getElementById('diskDetail').textContent = `${data.disk.used_gb} / ${data.disk.total_gb} GB`;
         document.getElementById('loadAverage').textContent = `${data.load_average['1min']} / ${data.load_average['5min']} / ${data.load_average['15min']}`;
         document.getElementById('uptimeValue').textContent = formatUptime(data.uptime_seconds);
+
+        updateTailscaleUI(data.tailscale);
     } catch (e) {
         console.error('Error fetching system stats:', e);
     }

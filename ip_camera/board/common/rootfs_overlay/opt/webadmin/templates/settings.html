@@ -44,7 +44,7 @@
             <div style="margin-top: 18px; border-top: 1px solid var(--border); padding-top: 14px;">
                 <div class="info-row"><span>WIFI (SSID)</span> <strong>{{ ssid }}</strong></div>
                 <div class="info-row"><span>IP Address</span> <strong>{{ ip }}</strong></div>
-                <div class="info-row"><span>Tailscale IP Address</span> <strong>{{ ip_tailscale }}</strong></div>
+                <div class="info-row"><span>Tailscale IP Address</span> <strong id="ipTailscale">{{ ip_tailscale }}</strong></div>
             </div>
         </div>
 
@@ -128,11 +128,12 @@
                 <div class="row" style="margin-bottom: 10px;">
                     <button class="btn-blue" onclick="sys_stream('update_mediamtx')">Update Camera Server</button>
                     <button class="btn-blue" onclick="sys_stream('update_webserver')">Update Webserver</button>
-                    <button class="btn-blue" onclick="sys_stream('setup_tailscale')">Setup Tailscale</button>
+                    <button class="btn-blue" onclick="sys_stream('sync_os_files')">Sync New OS Files</button>
                 </div>
                 <div class="row" style="margin-bottom: 10px;">
-                    <button class="btn-blue" onclick="sys_stream('sync_os_files')">Sync New OS Files</button>
                     <button class="btn-blue" id="getNativeAppBtn" onclick="getNativeApp()">Get Native App</button>
+                    <button class="btn-blue" id="tailscaleToggleBtn" onclick="toggleTailscale()">Setup Tailscale</button>
+                    <button class="btn-red" id="tailscaleLogoutBtn" onclick="tailscaleReauth()">Tailscale Reauth</button>
                 </div>
                 <div style="margin-top: 20px;">
                     <h3>Web Basic Auth</h3>
