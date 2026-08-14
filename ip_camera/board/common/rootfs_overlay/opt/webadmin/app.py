@@ -3,6 +3,7 @@ from flask import Flask, render_template, request, jsonify, redirect, url_for, R
 from functools import wraps
 import subprocess
 import os
+import sys
 import requests
 import time
 import hashlib
@@ -35,6 +36,30 @@ BABYCAMVIEW_REPO = "Manfi21/Babycam-View"
 BABYCAMVIEW_RELEASES_URL = f"https://github.com/{BABYCAMVIEW_REPO}/releases/latest"
 BABYCAMVIEW_CACHE_TTL = 900  # seconds (15 min)
 _babycamview_cache = {'data': None, 'fetched_at': 0.0}
+
+# gunicorn detaches worker output, so print() based debug output would be
+# lost. Detect gunicorn and re-point file descriptors 1/2 at the logfile.
+# Without gunicorn (plain `python3 app.py`) nothing changes.
+def _redirect_print_to_logfile():
+    if not any(m.startswith('gunicorn') for m in sys.modules):
+        return
+    log_path = '/var/log/webadmin.log'
+    try:
+        fd = os.open(log_path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
+        os.dup2(fd, 1)
+        os.dup2(fd, 2)
+        if fd > 2:
+            os.close(fd)
+        sys.stdout = os.fdopen(os.dup(1), 'w', buffering=1)
+        sys.stderr = os.fdopen(os.dup(2), 'w', buffering=1)
+        print(f"[webadmin] gunicorn detected - output redirected to {log_path}")
+    except Exception as e:
+        try:
+            print(f"[ERROR] Could not redirect output to logfile: {e}")
+        except Exception:
+            pass
+
+_redirect_print_to_logfile()
 
 _last_cpu_sample = {'total': None, 'idle': None}
 
@@ -1038,17 +1063,22 @@ def stream_page():
     return render_template('stream.html', ip=ip, stream_postfix=stream_postfix)
 
 # -----------------------
+# Runs for both `python3 app.py` AND gunicorn (`app:app`). gunicorn imports
+# this file as a module, so this must NOT live inside the __main__ guard.
+os.environ['PATH'] = os.environ.get('PATH', '') + ':/sbin:/usr/sbin'
+
+saved_audio = load_audio_config()
+
+if saved_audio:
+    try:
+        apply_audio_volume(saved_audio['control'], saved_audio['percent'])
+        apply_audio_mute(saved_audio['control'], saved_audio['muted'])
+    except Exception as e:
+        print(f"[WARN] Could not restore audio settings: {e}")
+else:
+    print(f"[WARN] No audo config found.")
+
 if __name__ == '__main__':
-    os.environ['PATH'] = os.environ.get('PATH', '') + ':/sbin:/usr/sbin'
-
-    saved_audio = load_audio_config()
-    if saved_audio:
-        try:
-            apply_audio_volume(saved_audio['control'], saved_audio['percent'])
-            apply_audio_mute(saved_audio['control'], saved_audio['muted'])
-        except Exception as e:
-            print(f"[WARN] Could not restore audio settings: {e}")
-
     try:
         app.run(host='0.0.0.0', port=80, threaded=True)
     except PermissionError:
