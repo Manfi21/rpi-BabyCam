@@ -193,9 +193,11 @@ function updateCropReadout() {
     const sizeEl = document.getElementById('cropSizeLabel');
     if (!zoomEl) return;
     const v = visibleView();
-    zoomEl.textContent = cropState.scale.toFixed(1) + '×';
+    const [, , rw, rh] = cropState.roi;
+    const effectiveZoom = cropState.scale / rw;
+    zoomEl.textContent = effectiveZoom.toFixed(1) + '×';
     if (sizeEl) {
-        sizeEl.textContent = `${Math.round(v.w * cropState.width)} × ${Math.round(v.h * cropState.height)} px`;
+        sizeEl.textContent = `${Math.round(v.w * rw * cropState.width)} × ${Math.round(v.h * rh * cropState.height)} px`;
     }
 }
 
