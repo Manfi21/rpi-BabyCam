@@ -562,7 +562,7 @@ def system_stream():
     commands = {
         "update_mediamtx": "/opt/webadmin/update_mediamtx.sh",
         "update_webserver": "/opt/webadmin/update_webserver.sh",
-        "sync_os_files": "python3 -u /opt/webadmin/update_os_files.py",
+        "sync_os_files": "/opt/webadmin/update_webserver.sh && python3 -u /opt/webadmin/update_os_files.py",
         "setup_tailscale": "tailscale up --accept-dns=false",
         "tailscale_down": "tailscale down",
         "tailscale_logout": "tailscale logout",
