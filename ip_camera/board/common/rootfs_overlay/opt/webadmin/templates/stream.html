@@ -119,7 +119,7 @@
                     if (data.status !== 'ok' || !data.version) return;
                     if (localStorage.getItem('bcview_banner_dismissed') === data.version) return;
 
-                    const inApp = /Electron/i.test(navigator.userAgent);
+                    const inApp = /Electron|BabyCamView/i.test(navigator.userAgent);
                     const installed = getInstalledAppVersion();
                     if (inApp && (!installed || !semverGt(data.version, installed))) return;
 
